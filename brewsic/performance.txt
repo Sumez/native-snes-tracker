@@ -1,0 +1,12 @@
+49152 bytes:
+IPL: 		0:37 -> 72:67 = 18894 -> 2,601460781200381/scanline = 681,5827246744998/frame
+Brewsic:	0:85 -> 50:25 = 13040 -> 3,769325153374233/scanline = 987,5631901840491
+
+262 scanlines per frame
+
+
+220 scanlines = 800 bytes
+
+
+
+16khz ? 226 samples per frame (NTSC) = 150 bytes, transfer using HDMA

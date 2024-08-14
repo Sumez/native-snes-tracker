@@ -1,0 +1,23 @@
+Block header (0xXX): 	cmnn nnnn
+				cm = 
+				1x = Clear notes, repeat mnnnnnn times (1-128)
+				01 = Macro, select from 64 sub-patterns (nnnnnn, 0-63) - Cannot use inside another macro!
+				00 = Read as-is for nnnnnn rows (1-64)
+
+Row header (0xXX): evii iiii
+				iiiiii = instrument (0-54) (63 = no note, 62 = note off, 61 = cut note, 60 = fade note, 59 = repeat note, 58 = note +1, 57 = note -1, 56 = octave +12, 55 = octave -12)
+				v = volume effect enabled
+				e = effect enabled
+
+Volume effect (if v effect) (0xXX) 
+Effect (if effect) (0xXX) rrre eeee - rrr=Repeat previous param (history of 8)
+Effect Param (if effect) (0xXX)
+Note (if instrument < 55) (0xXX): -nnn nnnn - Frequency table reference
+
+
+
+
+The 65C816-side API needs at least some version of the following routines to make the driver useful.  playBgm() (may load the BGM before playing, or loading may be a separate function), playSfx(), setBgmVolume(), setSfxVolume(), setStereo(), setMono().
+sgeos — Today at 12:48
+Some games dynamically change the music based on the games state.  For example, speeding up the tempo at low health, or silencing channels depending on what is on screen.  Instruments could also be swapped in.  My guess is that the best technical solution for advances use cases is a custom driver.
+I seem to recall Donkey Kong Country being a game that dynamically modifies BGM playback, but it may have been something else.

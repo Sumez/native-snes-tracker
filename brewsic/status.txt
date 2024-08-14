@@ -1,0 +1,33 @@
+Import TODOs:
+
+Fade out samples quickly instead of cutting volume(maybe? or is it the composer's job?)
+Effect parameter compression (0/repeat/repeat-1/0f/f0)
+preemphesis of high frequencies (see tepples wav2brr.py)
+
+H effect
+K effect
+
+Instrument data:
+Vibrato
+Volume SustainEnvelope
+
+
+I/O code:
+HDMA stream samples
+
+current size stats:
+
+pollen
+								Sample data size: 8280 bytes
+								Track data size: 6613 bytes
+
+streets
+Sample data size: 32463 bytes					Sample data size: 21708 bytes
+Track data size: 4711 bytes					Track data size: 4711 bytes
+
+
+royal
+Sample data size: 70821 bytes	Sample data size: 30051 bytes	Sample data size: 30069 bytes
+Track data size: 2164 bytes	Track data size: 2164 bytes	Track data size: 2164 bytes
+
+unroll				don't touch			resample
