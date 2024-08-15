@@ -559,6 +559,7 @@ LoadTrack:
 	mov a, #0 ; Always start at the beginning
 	mov !CurrentOrderIndex, a
 	call !ResetPattern
+	inc PatternRowCounter ; Usually a new track is loaded AFTER counting down one row, so add +1 on the first pattern to acocunt for that
 ret
 
 ResetPattern:
@@ -574,7 +575,6 @@ ResetPattern:
 		; Reached end of patterns
 		jmp !StopTrack
 	:
-	inc a
 	mov PatternRowCounter, a
 	
 	mov a, #16
@@ -1094,7 +1094,7 @@ JumpToNextPattern:
 	bne :+
 		mov PatternRowCounter, #1
 	:
-ret
+return: ret
 
 NoteProgressionMacros:
 .byte 0,0,0,0,0,0
@@ -1122,9 +1122,11 @@ ReadNote:
 
 		bra :++
 	:
-		mov !ChLastInstrument+x, a ; Remember instrument (in case of macros?)
+		mov !ChLastInstrument+x, a ; Remember instrument (in case of note progression macros)
 		mov a, [CurrentPatternPointer]+y ; Read note value
 		inc y
+		cmp a, #$ff ; TRK: Ineffecient way to indicate no note, but ensures constant pattern size for live edits in tracker
+		beq return
 	:
 	push y ; We need to free the Y register for the next few calculations
 
@@ -1187,11 +1189,11 @@ ReadNote:
 	clrc
 	adc a, ChPitchL+x ; Add note pitch to instrument adjustment, 16 bit operation with carry
 	mov ChPitchL+x, a
-	mov !ChOrigPitchL+x, a
+	mov !ChOrigPitchL+x, a ; Stored for use in arp commands
 	mov a, y
 	adc a, ChPitchH+x
 	mov ChPitchH+x, a
-	mov !ChOrigPitchH+x, a
+	mov !ChOrigPitchH+x, a ; Stored for use in arp commands
 	
 	mov a, CurrentChannelVolumeAdjust
 	cmp a, #$ff

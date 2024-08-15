@@ -2,6 +2,9 @@
 .include "src/snes.inc"
 .smart
 
+.segment "CODE7"
+Name: .byte "Song",$ff
+
 .segment "BSS"
 
 SongTilesBuffer = TilemapBuffer + $100
@@ -28,12 +31,14 @@ rtl
 .export Song_LoadView = LoadView
 LoadView:
 
-	Bind Input_StartPlayback, NoAction
+	Bind Input_StartPlayback, PlayFullSong
 	Bind Input_CustomHandler, HandleInput
 	Bind Input_NavigateIn, NavigateToChain
 	Bind Input_NavigateBack, NoAction
 	Bind OnPlaybackStopped, NoAction
-		
+	
+	ldy #.loword(Name)
+	jsl WriteTilemapHeader
 	jsl WriteTilemapBuffer
 	jsl ShowCursor_long
 rts
@@ -46,9 +51,9 @@ WriteTilemapBuffer:
 	plb
 	ldy #0
 	ldx #8
-	@rowLoop:
+	@colLoop:
 		
-		@colLoop:
+		@rowLoop:
 			lda ChainIndexes,Y
 			cmp #$ff
 			beq :+
@@ -73,24 +78,29 @@ WriteTilemapBuffer:
 				lda #$1f
 				sta f:SongTilesBuffer+2,x
 			:
-			inx
-			inx
-			inx
-			inx
-			inx
-			inx
+			seta16
+			txa
+			clc
+			adc #$40
+			tax
+			seta8
 			iny
 			tya
-			and #7
-		bne @colLoop
+			and #31 ; TODO: dynamically keep Y inside scroll window, maybe use indirect indexed to load?
+		bne @rowLoop
 		seta16
-		txa
+		tya
 		clc
-		adc #($40-48)
+		adc #($100-32)
+		tay
+		
+		txa
+		sec
+		sbc #(($40*32)-6)
 		tax
 		seta8
 		
-		cpy #168
+		cpy #$800
 	bne @rowLoop
 	plb
 rtl
@@ -98,9 +108,9 @@ rtl
 .segment "CODE7"
 
 PreparePlayback:
-	jsr CopyCurrentSongToSpcBuffer
+	;jsl CopyCurrentSongToSpcBuffer
 	; TODO: If currently playing, don't transfer yet, wait till song stops
-	jsr TransferEntirePlaybackBufferToSpc
+	;jsr TransferEntirePlaybackBufferToSpc
 rts
 
 ChainIndexWasChanged:
@@ -111,6 +121,7 @@ GetActiveIndexesFromCursor:
 	seta16
 	lda CursorPosition
 	tax ; Selected chain entry in X
+	xba ; CursorPosition is $0xyy, where x = channel and yy = song row
 	and #7
 	tay ; Active column in Y
 	seta8
@@ -262,39 +273,29 @@ IncreaseCurrentChain:
 rts
 
 MoveCursorUp:
-	seta16
 	lda CursorPosition
-	sec
-	sbc #8
-	bcc :+
-		sta CursorPosition
-	:
-	seta8
-jmp ShowCursor
-MoveCursorDown:
-	seta16
-	lda CursorPosition
-	clc
-	adc #8
-	cmp #21*8
-	bcs :+
-		sta CursorPosition
-	:
-	seta8
-jmp ShowCursor
-MoveCursorLeft:
-	lda CursorPosition
-	bit #7
 	beq :+
 		dec CursorPosition
 	:
 jmp ShowCursor
-MoveCursorRight:
+MoveCursorDown:
 	lda CursorPosition
-	and #7
-	cmp #7
+	cmp #21
 	beq :+
 		inc CursorPosition
+	:
+jmp ShowCursor
+MoveCursorLeft:
+	lda CursorPosition+1
+	beq :+
+		dec CursorPosition+1
+	:
+jmp ShowCursor
+MoveCursorRight:
+	lda CursorPosition+1
+	cmp #7
+	beq :+
+		inc CursorPosition+1
 	:
 jmp ShowCursor
 
@@ -302,18 +303,14 @@ ShowCursor_long: jsr ShowCursor
 rtl
 ShowCursor:
 
-	lda CursorPosition
-	and #7
+	lda CursorPosition+1 ; Column/channel
 	sta 0
 	asl
 	adc 0 ; ASL+self = multiply by 3
 	adc #4
 	sta CursorX
 	
-	lda CursorPosition
-	lsr
-	lsr
-	lsr ; Just divide by 8 to get row count
+	lda CursorPosition ; Row
 	clc
 	adc #4
 	sta CursorY
@@ -323,5 +320,4 @@ ShowCursor:
 jmp UpdateCursorSpriteAndHighlight
 
 
-CopyCurrentSongToSpcBuffer:
-rts
+

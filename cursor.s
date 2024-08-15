@@ -20,19 +20,6 @@ Init: .export Cursor_Init = Init
 	stz EditMode
 rtl
 
-SetPaletteValues_Pattern:
-	sta f:TilemapBuffer+9,x
-	sta f:TilemapBuffer+11,x
-	sta f:TilemapBuffer+13,x
-
-	sta f:TilemapBuffer+17,x
-	sta f:TilemapBuffer+19,x
-
-	sta f:TilemapBuffer+23,x
-	sta f:TilemapBuffer+25,x
-	sta f:TilemapBuffer+27,x
-rts
-
 SetPaletteValues:
 sta 0
 :
@@ -57,6 +44,8 @@ sta 0
 rts
 
 UpdateCursorSpriteAndHighlight:
+
+; TODO: On song view, highlight the whole column instead of the whole row, because the rows aren't tied together
 
 	lda #0
 	ldx PrevCursorPositionOffset

@@ -76,7 +76,7 @@
   <File>
     <Id>11</Id>
     <RelativePath>brewsic/brewsic-spc.s</RelativePath>
-    <Mode>Ignore</Mode>
+    <Mode>Spc</Mode>
   </File>
   <File>
     <Id>12</Id>
@@ -199,5 +199,103 @@
     <Id>25</Id>
     <RelativePath>gfx/stage-convert.py</RelativePath>
     <Mode>Ignore</Mode>
+  </File>
+  <File>
+    <Id>26</Id>
+    <RelativePath>playback.s</RelativePath>
+    <Mode>IncludeInAssembly</Mode>
+  </File>
+  <File>
+    <Id>27</Id>
+    <RelativePath>gfx/ui.png</RelativePath>
+    <Mode>ContentPipeline</Mode>
+    <Pipeline>
+      <Type>chr</Type>
+      <Output>gfx/ui.chr</Output>
+      <Output>gfx/ui.pal</Output>
+      <Output>gfx/ui.map</Output>
+      <LastProcessed>2024-08-15T21:30:59.0072421+02:00</LastProcessed>
+      <Property>
+        <Key>DiscardRedundant</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>ReducePalette</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>ExportPalette</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>BigTiles</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>ExportTileMap</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>TileMapAttribute</Key>
+        <Value>0000</Value>
+      </Property>
+      <Property>
+        <Key>ChrType</Key>
+        <Value>Bpp2</Value>
+      </Property>
+      <Property>
+        <Key>Palette</Key>
+        <Value>1,223,113,38,255;2,153,229,80,255</Value>
+      </Property>
+    </Pipeline>
+  </File>
+  <File>
+    <Id>28</Id>
+    <RelativePath>gfx/ui.aseprite</RelativePath>
+    <Mode>Ignore</Mode>
+  </File>
+  <File>
+    <Id>29</Id>
+    <RelativePath>gfx/box.png</RelativePath>
+    <Mode>ContentPipeline</Mode>
+    <Pipeline>
+      <Type>chr</Type>
+      <Output>gfx/box.chr</Output>
+      <Output>gfx/box.pal</Output>
+      <Output>gfx/box.map</Output>
+      <LastProcessed>2024-08-15T23:23:54.4940517+02:00</LastProcessed>
+      <Property>
+        <Key>DiscardRedundant</Key>
+        <Value>1</Value>
+      </Property>
+      <Property>
+        <Key>ReducePalette</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>ExportPalette</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>BigTiles</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>ExportTileMap</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>TileMapAttribute</Key>
+        <Value>0000</Value>
+      </Property>
+      <Property>
+        <Key>ChrType</Key>
+        <Value>Bpp2</Value>
+      </Property>
+      <Property>
+        <Key>Palette</Key>
+        <Value>0,0,0,0,255;3,218,185,152,255</Value>
+      </Property>
+    </Pipeline>
   </File>
 </BrewmasterProject>

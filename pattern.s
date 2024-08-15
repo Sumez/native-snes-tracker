@@ -1,6 +1,11 @@
 .include "global.inc"
 .include "src/snes.inc"
 .smart
+.import StartTestPatternPlayback, PrepareTestPatternPlayback, StopPlayback, SwitchToSingleNoteMode, TransferSingleNoteToSpcAndPlay
+.import UpdateNoteInPlayback, NoteDataOffsetInPhrase
+
+.segment "CODE7"
+Name: .byte "Phrase_-_",$ff
 
 .segment "BSS"
 
@@ -19,8 +24,8 @@ PatternNotes: .res 16
 PatternInstruments: .res 16
 PatternCommands: .res 16
 PatternCommandParams: .res 16
-CurrentPhraseIndexInGlobalSong: .res 2
-QueuePreparePlayback: .res 1
+CurrentPhraseIndex: .res 1
+CurrentPhraseIndexInSongData: .res 2
 
 .segment "CODE6"
 
@@ -44,6 +49,7 @@ LoadView:
 	tya
 	cmp #$ff
 	beq :+
+		; $ff when navigating backwards from instrument
 		jsl LoadGlobalData
 	:
 
@@ -54,11 +60,22 @@ LoadView:
 	Bind OnPlaybackStopped, SwitchToSingleNoteMode
 	
 	jsl PreparePlayback_long
+	ldy #.loword(Name)
+	jsl WriteTilemapHeader
+	lda CurrentPhraseIndex
+	jsl WriteTilemapHeaderId
 	jsl WritePatternTilemapBuffer
 	jsl ShowCursor_long
+
+	;TODO: DELETE
+	wai
+	lda #%00010110
+	sta BLENDMAIN
+
 rts
 
 LoadGlobalData:
+	sta CurrentPhraseIndex
 	; Copy selected phrase data to temp memory
 	seta16
 	and #$00ff
@@ -71,10 +88,10 @@ LoadGlobalData:
 	asl
 	tax
 	seta8
-	stx CurrentPhraseIndexInGlobalSong
+	stx CurrentPhraseIndexInSongData
 	ldy #0
 	@loop:
-		lda f:PHRASES,x
+		lda f:PHRASES+0,x
 		sta PatternInstruments,y
 		lda f:PHRASES+1,x
 		sta PatternCommands,y
@@ -93,11 +110,11 @@ rtl
 UpdateGlobalData:
 	; Copy temp memory to selected phrase
 	; TODO: Update only currently selected bar
-	ldx CurrentPhraseIndexInGlobalSong
+	ldx CurrentPhraseIndexInSongData
 	ldy #0
 	@loop:
 		lda PatternInstruments,y
-		sta f:PHRASES,x
+		sta f:PHRASES+0,x
 		lda PatternCommands,y
 		sta f:PHRASES+1,x
 		lda PatternCommandParams,y
@@ -298,8 +315,22 @@ rtl
 .segment "CODE7"
 
 NoteWasChanged:
-	jsl WritePatternTilemapBuffer
 	jsl UpdateGlobalData
+	lda IsPlaying
+	beq :+
+		lda CursorPositionRow
+		asl
+		asl ; x4. Max 64, so 8bit A is fine yet
+		sta NoteDataOffsetInPhrase
+		seta16
+		and #$00ff
+		adc CurrentPhraseIndexInSongData ; should point to the block of 4 relevant bytes
+		tay ; [Y] tells where to read data from
+		seta8
+		lda CurrentPhraseIndex ; [A] tells which phrase to look for in compiled song data
+		jsr UpdateNoteInPlayback
+	:
+	jsl WritePatternTilemapBuffer
 rts
 
 PlayCurrentNote:
@@ -313,15 +344,13 @@ PlayCurrentNote:
 	lda IsPlaying
 	bne :+ ; If currently playing, just don't do anything
 		jsr CompileCurrentNoteToBuffer
-		jsr TransferSingleNoteToSpc
-		lda #0
-		jsr BrewsicPlayTrack
+		jsr TransferSingleNoteToSpcAndPlay
 	:
 rts
 CutCurrentlyPlayingNote:
 	lda IsPlaying
 	bne :+ ; If currently playing, just don't do anything
-		jsr BrewsicStopTrack
+		jsr StopPlayback
 	:
 rts
 
@@ -550,63 +579,8 @@ ShowCursor:
 	
 jmp UpdateCursorSpriteAndHighlight
 
-PreparePlayback_long: jsr PreparePlayback
+PreparePlayback_long: jsr PrepareTestPatternPlayback
 rtl
-PreparePlayback:
-	lda IsPlaying
-	sta QueuePreparePlayback ; If playing, don't prepare now, but enqueue until current playback ended to avoid conflicting with it
-	bne :+
-		jsr CopyTestPatternToSpcBuffer
-		jsr TransferEntirePlaybackBufferToSpc
-	:
-rts
-
-.import BrewsicPlayTrack, BrewsicStopTrack
-StartPlayback:
-	jsr CompilePatternToBuffer
-	jsr TransferEntirePlaybackBufferToSpc
-	lda #0
-	jsr BrewsicPlayTrack
-rts
-
-CopyTestPatternToSpcBuffer:
-	ldx #0
-	:
-		;.import TEST_PATTERN
-		;lda f:TEST_PATTERN+$5099,X
-		lda f:TEST_PATTERN2,X
-		sta f:CompiledPattern,X
-		inx
-		cpx #Pattern16Offset
-	bne :-
-rts
-
-SwitchToSingleNoteMode:
-
-	lda QueuePreparePlayback
-	beq :+
-		jsr PreparePlayback ; If prepare was queued, do it now
-	:
-
-	; Switch to playing single note pattern
-	seta16
-	lda #Pattern01Index
-	sta f:CompiledPattern+PatternReferenceOffset
-
-	lda #SilentPatternIndex
-	sta f:CompiledPattern+PatternReferenceOffset+2
-	sta f:CompiledPattern+PatternReferenceOffset+4
-	sta f:CompiledPattern+PatternReferenceOffset+6
-	sta f:CompiledPattern+PatternReferenceOffset+8
-	sta f:CompiledPattern+PatternReferenceOffset+10
-	sta f:CompiledPattern+PatternReferenceOffset+12
-	sta f:CompiledPattern+PatternReferenceOffset+14
-	
-	lda #$ffff
-	seta8
-	
-	jsr TransferPatternReferencesToSpc
-rts
 
 CompileCurrentNoteToBuffer:
 	ldx #Pattern01Offset
@@ -619,173 +593,8 @@ CompileCurrentNoteToBuffer:
 	sta f:CompiledPattern+2,X
 rts
 
-CompilePatternToBuffer:
-	; Switch to playing full phrase
-	lda #<Pattern16Index
-	sta f:CompiledPattern+PatternReferenceOffset
-	lda #>Pattern16Index
-	sta f:CompiledPattern+PatternReferenceOffset+1
-
-	; Load phrase into test pattern
-	ldx #Pattern16Offset
-	lda #15
-	sta f:CompiledPattern,X
-	inx
-	ldy #0
-	@rowLoop:
-		lda PatternNotes,Y
-		cmp #$ff
-		bne :+
-			lda #63
-			sta f:CompiledPattern,X
-			bra :++
-		:
-			sta f:CompiledPattern+1,X
-			lda PatternInstruments,Y ; Instrument/header
-			sta f:CompiledPattern,X
-			inx
-		:
-		inx
-		iny
-		cpy #15
-	bne @rowLoop
-	; Final row with loop effect added
-	lda PatternNotes,Y
-	cmp #$ff
-	bne :+
-		lda #63|$80
-		sta f:CompiledPattern,X
-		lda #2 ; Loop effect
-		sta f:CompiledPattern+1,X
-		lda #0
-		sta f:CompiledPattern+2,X
-		bra :++
-	:
-		sta f:CompiledPattern+3,X
-		lda #0|$80
-		sta f:CompiledPattern,X
-		lda #2 ; Loop effect
-		sta f:CompiledPattern+1,X
-		lda #0
-		sta f:CompiledPattern+2,X
-
-	:
+StartPlayback:
+	lda CurrentPhraseIndex
+	ldy CurrentPhraseIndexInSongData
+	jsr StartTestPatternPlayback
 rts
-
-TransferPatternReferencesToSpc:
-	ldx #PatternReferenceOffset
-	ldy #4
-jmp spcTransfer
-
-TransferSingleNoteToSpc:
-	ldx #Pattern01Offset
-	ldy #8
-jmp spcTransfer
-
-
-TEST_PATTERN2:
-Pattern16Offset = test_pattern_16_bars - TEST_PATTERN2
-Pattern01Offset = test_pattern_single_note - TEST_PATTERN2
-PatternReferenceOffset = test_pattern_trackindex_start - TEST_PATTERN2
-
-Pattern16Index = test_pattern_16_bars - test_pattern_trackindex_start
-Pattern01Index = test_pattern_single_note - test_pattern_trackindex_start
-SilentPatternIndex = test_pattern_silent - test_pattern_trackindex_start
-
-;HEADER
-.byte $06,$50, $60,$20, $60,$20, $60,$20, $60,$20, $60,$20, $60,$20, $60,$20, $60,$20
-
-;ORDERS
-test_pattern_trackindex_start:
-.addr Pattern01Index,SilentPatternIndex,SilentPatternIndex,SilentPatternIndex,SilentPatternIndex,SilentPatternIndex,SilentPatternIndex,SilentPatternIndex
-.addr $FFFF ; ORDER LIST END
-
-;PATTERN LENGTH TABLE (number of rows per pattern)
-.byte 16
-.byte $00 ; END
-
-;MACRO DIRECTORY
-.addr $FFFF ; END
-
-;INSTRUMENTS
-.byte $01 ; sample
-.word $FFF7 ; pitch adjust
-.byte $00 ; fadeout
-.byte $A0 ; volume
-.addr $0000 ; volume envelope address
-.byte 0 ; unused
-
-.byte $02 ; sample
-.word $FFF7 ; pitch adjust
-.byte $00 ; fadeout
-.byte $A0 ; volume
-.addr $0000 ; volume envelope address
-.byte 0 ; unused
-
-.byte $03 ; sample
-.word $FFF7 ; pitch adjust
-.byte $00 ; fadeout
-.byte $A0 ; volume
-.addr $0000 ; volume envelope address
-.byte 0 ; unused
-
-.byte $05 ; sample
-.word $FFF7 ; pitch adjust
-.byte $00 ; fadeout
-.byte $A0 ; volume
-.addr $0000 ; volume envelope address
-.byte 0 ; unused
-
-.byte $06 ; sample
-.word $FFF7 ; pitch adjust
-.byte $00 ; fadeout
-.byte $A0 ; volume
-.addr $0000 ; volume envelope address
-.byte 0 ; unused
-
-.byte $00 ; sample
-.word $FFF7 ; pitch adjust
-.byte $00 ; fadeout
-.byte $A0 ; volume
-.addr $0000 ; volume envelope address
-.byte 0 ; unused
-
-
-;SILENT PATTERN
-test_pattern_silent: .byte $80|16 ; 16 silent rows
-
-test_pattern_single_note:
-.byte 0; Block header: 1 bar (1 minus 1)
-.byte $00 ; Insert instrument here
-.byte $00 ; Insert note here
-.byte $80|15 ; 15 silent rows
-
-;MY PATTERN
-test_pattern_16_bars:
-; Instrument 60 = cut, 61 = fase, 62 = off, 63 = nothing happens, 54-59 = macros
-.byte 15 ; Block header: Number of bars minus 1
-.byte $00 ; Instrument 0-52
-.byte 12*4 ; Note byte
-.byte 63 ; silence
-.byte $00 ; Instrument 0-52
-.byte 12*4+1 ; Note byte
-.byte 63 ; silence
-.byte $00 ; Instrument 0-52
-.byte 12*4+2 ; Note byte
-.byte 63 ; silence
-.byte $00 ; Instrument 0-52
-.byte 12*4+3 ; Note byte
-.byte 63 ; silence
-.byte $00 ; Instrument 0-52
-.byte 12*4 ; Note byte
-.byte 63 ; silence
-.byte $00 ; Instrument 0-52
-.byte 12*4 ; Note byte
-.byte 63 ; silence
-.byte $00 ; Instrument 0-52
-.byte 12*4 ; Note byte
-.byte 63 ; silence
-.byte $00 ; Instrument 0-52
-.byte 12*4 ; Note byte
-.byte 63 ; silence
-

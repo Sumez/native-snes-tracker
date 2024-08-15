@@ -46,14 +46,31 @@ stz NMITEST
 	asl
 	asl
 	asl
+	asl
 	stz CGADDR
 	stz CGDATA
 	sta CGDATA
-	
+	bne :+
+		lda #$09
+		sta CGADDR
+		lda #$42
+		sta CGDATA
+		lda #$10
+		sta CGDATA
+		bra :++
+	:
+		lda #$09
+		sta CGADDR
+		lda #$84
+		sta CGDATA
+		lda #$20
+		sta CGDATA
+	:
 
 
-.import CopyEntireTilemap
+.import CopyEntireTilemap, CopyTilemapToUiLayer
 jsl CopyEntireTilemap ; TODO: just queue updated rows?
+;jsl CopyTilemapToUiLayer
 
 	lda RefreshOam
 	beq :+

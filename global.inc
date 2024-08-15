@@ -1,3 +1,4 @@
+.global PatternNotes,PatternInstruments
 .define GAME_TITLE "SuperTrax"
 
 .define TilemapBufferSegment "BSS7F"
@@ -8,10 +9,12 @@
 .global SONG, CHAINS, PHRASES, INSTRUMENTS
 .globalzp Input_CustomHandler, Input_NavigateIn, Input_NavigateBack, Input_MoveLeft, Input_MoveUp, Input_MoveRight, Input_MoveDown
 .globalzp Input_StartPlayback, OnPlaybackStopped
-.global IsPlaying, CompiledPattern, TilemapBuffer, EditMode
+.global IsPlaying, CompiledPattern, TilemapBuffer, UiTilemapBuffer, EditMode
+.global Pattern01Offset ; Unsure about these
+.global PlayFullSong
 
 ; Global routines
-.global NavigateToScreen, TransferEntirePlaybackBufferToSpc, spcTransfer
+.global NavigateToScreen, WriteTilemapHeader, WriteTilemapHeaderId
 .global PlayMosaic
 
 ; Cursor stuff
@@ -90,42 +93,15 @@ State_Running = %00010000
 State_Landing = %00100000
 State_Dead = %11111111
 
-.ifdef SHOOTER
-
-SpriteChrBase = $4000
-Bg1TileMapBase = $0000
-Bg2TileMapBase = $8000
-Bg3TileMapBase = $f000
-Bg1ChrBase = $2000
-Bg2ChrBase = $a000
-Bg3ChrBase = $e000
-Bg4ChrBase = $0000
-
-.elseif .defined(FRP)
-
-Bg2TileMapBase = $0000 ; -$C000 ? // $1000
-Bg3TileMapBase = $1000 ; -$2000
-Bg1ChrBase = $2000 ; -$A000
-
-Bg2ChrBase = $A000
-Bg3ChrBase = $A000 ; Only few tiles needed
-SpriteChrBase = $C000 ; -?
-Bg1TileMapBase = $F000 ; -END
-
-Bg4ChrBase = $0000 ; Unused
-
-.else ; Platformer
-
 SpriteChrBase = $4000
 Bg1TileMapBase = $1000 ; -$2000 ; Should be an "even" number, so we cna easily "and" the address pointer
 Bg2TileMapBase = $8000 ; -$6800
 Bg3TileMapBase = $f000 ; -$6800
 Bg1ChrBase = $2000
 Bg2ChrBase = $a000
-Bg3ChrBase = $0000
+Bg3ChrBase = Bg2ChrBase
+;Bg3ChrBase = $0000
 Bg4ChrBase = $0000
-
-.endif
 
 
 .i16
@@ -231,8 +207,22 @@ Bg4ChrBase = $0000
     jsr LoadMode7TileMap
 .endmacro
 
-.charmap ' ',$80
-.charmap '!',$5B
-.charmap '?',$5C
-.charmap '.',$7B
+
+
+.charmap 'C',$02
+.charmap 'P',$0f
+.charmap 'S',$12
+.charmap 'a',$20
+.charmap 'e',$24
+.charmap 'g',$26
+.charmap 'h',$27
+.charmap 'i',$28
+.charmap 'n',$2d
+.charmap 'o',$2e
+.charmap 'r',$31
+.charmap 's',$32
+.charmap '-',$3b
+.charmap '_',$3f
+
 .smart
+

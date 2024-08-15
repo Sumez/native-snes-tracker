@@ -9,6 +9,9 @@
 
 TilemapBuffer:
 .res 32*32*2
+.res $200 ; TODO: (remove) buffer because our song view currently overflows the tilemap buffer...
+UiTilemapBuffer:
+.res 32*32*2
 
 .segment SongDataSegment
 .assert * = $700000, error, "Song data must start at $0000 in sram for compatibility"
@@ -38,7 +41,6 @@ OnPlaybackStopped: .res 2
 
 .segment "BSS"
 CurrentScreen: .res 1
-IsPlaying: .res 1
 ResetStack: .res 2
 
 .segment CompiledPlaybackDataSegment
@@ -80,6 +82,10 @@ InitEditor:
 jsr ResetSprites
 jsr FinalizeSprites
 LoadBlockToOAM OamBuffer, 544
+
+	jsl LoadBackgroundUi
+	jsl CopyTilemapToUiLayer
+
 	
 	lda #0
 	sta CurrentScreen
@@ -166,26 +172,6 @@ MainLoop:
 	bpl :-	
 
 	jsr UpdateInputStates
-;	jsr ResetSprites
-
-	
-	lda ButtonStates
-	bit #<KEY_L
-	beq @afterNav
-		lda ButtonPushed+1
-		bit #>KEY_RIGHT
-			beq :+
-				;jsl InitiateChainView
-				;jsl InitiatePhraseView
-				jmp MainLoop
-		:
-		bit #>KEY_LEFT
-			beq :+
-				;jsl InitiateChainView
-				;jsl InitiateSongView
-				jmp MainLoop
-	@afterNav:
-
 	jsr Vfx_Update
 	jsr HandleInput
 
@@ -291,12 +277,61 @@ DefaultChain: .byte $FF
 	jsr (.loword(TableReference), X)
 .endmacro
 
-.export CopyEntireTilemap
+.export CopyEntireTilemap, CopyTilemapToUiLayer
 CopyEntireTilemap:
 	LoadBlockToVRAM TilemapBuffer, Bg2TileMapBase, 32*32*2
 rtl
+CopyTilemapToUiLayer:
+	LoadBlockToVRAM UiTilemapBuffer, Bg3TileMapBase, 32*32*2
+rtl
 
 .segment "CODE6"
+
+LoadBackgroundUi:
+	jsr ClearUiTilemap
+	seta16
+	lda #$08df
+	ldx #$106
+	:
+		sta f:UiTilemapBuffer,x
+		inx
+		inx
+		cpx #$11e
+	bne :-
+	ldx #$206
+	:
+		sta f:UiTilemapBuffer,x
+		inx
+		inx
+		cpx #$21e
+	bne :-
+	ldx #$306
+	:
+		sta f:UiTilemapBuffer,x
+		inx
+		inx
+		cpx #$31e
+	bne :-
+	ldx #$406
+	:
+		sta f:UiTilemapBuffer,x
+		inx
+		inx
+		cpx #$41e
+	bne :-
+	seta8
+rtl
+ClearUiTilemap:
+	seta16
+	lda #($3f*2) ; Blank space - * 2 because it's 2bpp
+	ldx #((32*32*2)-2)
+	:
+		sta f:UiTilemapBuffer,x
+		dex
+		dex
+	bpl :-
+	seta8
+rts
 
 ClearTilemap:
 	seta16
@@ -310,6 +345,37 @@ ClearTilemap:
 	seta8
 rts
 
+WriteTilemapHeader:
+	sty 0
+	ldy #0
+	ldx #$88
+	:
+		lda (0),y
+		bpl :+
+			rtl
+		:
+		sta f:TilemapBuffer,x
+		iny
+		inx
+		inx
+	bra :--
+	
+WriteTilemapHeaderId:
+	pha
+	and #$F0
+	lsr
+	lsr
+	lsr
+	lsr
+	ora #$40
+	sta f:TilemapBuffer,x
+	pla
+	and #$0F
+	ora #$40
+	sta f:TilemapBuffer+2,x
+rtl
+
+
 LoadView:
 	jsr ClearTilemap
 	jumpTable ViewLoaders
@@ -322,12 +388,17 @@ HandleInput:
 
 	lda ButtonPushed+1
 	bit #>KEY_START
-	beq :++
+	beq @didNotPushStart
 	
 		lda IsPlaying
-		bne :+
+		bne :++
 			lda #1
 			sta IsPlaying
+			lda ButtonStates+1
+			bit #>KEY_SELECT
+			beq :+
+				jmp PlayFullSong
+			:			
 			jmp (Input_StartPlayback)
 			;RETURNS - no more inputs read this frame
 		rts
@@ -337,7 +408,8 @@ HandleInput:
 			jsr BrewsicStopTrack
 			jmp (OnPlaybackStopped)
 			;RETURNS - no more inputs read this frame
-	:
+	
+	@didNotPushStart:
 
 	lda ButtonStates+1
 	and #>KEY_SELECT
@@ -374,38 +446,3 @@ HandleInput:
 	:
 
 jmp (Input_CustomHandler)
-
-
-TransferEntirePlaybackBufferToSpc:
-	ldx #0
-	ldy #$100
-jmp spcTransfer
-
-; X = Offset to transfer from
-; Y = Bytes to transfer
-spcTransfer:
-.importzp BrewsicTransferDestination
-.import BrewsicTransfer, BrewsicPlaySound
-@patternDataStartInSpcMemory = $6098 ; Needs to be dynamic, determined after transfer of samples
-	
-	seta16
-	txa
-	clc
-	adc #@patternDataStartInSpcMemory
-	sta z:BrewsicTransferDestination ; Destination in SPC memory
-
-	txa
-	clc
-	adc #.loword(CompiledPattern)
-	tax ; X = Source start to copy from
-	seta8
-	lda #^CompiledPattern
-	;ldy #$100 ; Y = Size
-	
-	; Disable NMI interrupts to avoid transfer being stalled by NMI.
-	; Will cause issues because the SPC code always assumes the CPU code is faster, and doesn't wait for data
-	stz PPUNMI
-	jsr BrewsicTransfer
-	lda #VBLANK_NMI|AUTOREAD
-	sta PPUNMI
-rts

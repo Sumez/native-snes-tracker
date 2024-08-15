@@ -6,6 +6,8 @@
 TextAddresses:
 DialogChr:
 .incbin "gfx/font.chr"
+.incbin "gfx/ui.chr"
+.incbin "gfx/box.chr"
 DialogChrEnd:
 CursorSpriteChr:
 .incbin "gfx/cursor.chr"

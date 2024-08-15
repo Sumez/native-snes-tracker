@@ -34,7 +34,7 @@ map_mode:
 .byte $02   ; 00: no extra RAM; 02: RAM with battery
 ;.byte MEMSIZE_256KB  ; ROM size (08-0C typical)
 .byte MEMSIZE_1MB  ; ROM size (08-0C typical)
-.byte MEMSIZE_16KB                  ; SRAM size
+.byte MEMSIZE_64KB                  ; SRAM size
 .byte $01                   ; $01 = U.S.  $00 = Japan, that's all I know
 .byte $33              ; Just use $00 ; Publisher ID
 .byte $00                   ; $00 = 1.00, $01 = 1.01, etc.

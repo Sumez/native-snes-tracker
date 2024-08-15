@@ -2,9 +2,12 @@
 .include "src/snes.inc"
 .smart
 
+.segment "CODE7"
+Name: .byte "Chain_-_",$ff
+
 .segment "BSS"
 
-ChainTilesBuffer = TilemapBuffer + $100
+ChainTilesBuffer = TilemapBuffer + $102
 ;Needs init:
 CursorRow: .res 2
 LastEditedPhrase: .res 1
@@ -13,6 +16,7 @@ LastEditedTranspose: .res 1
 ;Loaded when view loads:
 PhraseIndexes: .res $10
 TransposeValues: .res $10
+CurrentChainIndex: .res 1
 CurrentChainIndexInGlobalSong: .res 2
 
 .segment "CODE6"
@@ -40,12 +44,24 @@ LoadView:
 	Bind Input_NavigateBack, NavigateToSong
 	Bind OnPlaybackStopped, NoAction
 	
+	ldy #.loword(Name)
+	jsl WriteTilemapHeader
+	lda CurrentChainIndex
+	jsl WriteTilemapHeaderId
+	
 	jsl WriteTilemapBuffer
 	jsl ShowCursor_long
+	
+	;TODO: DELETE
+	wai
+	lda #%00010010
+	sta BLENDMAIN
+
 rts
 
 LoadGlobalData:
 	; Copy selected chain data to temp memory
+	sta CurrentChainIndex
 	seta16
 	and #$00ff
 	; Every Chain is $20 bytes, so shift left 5 times (x32)
@@ -132,9 +148,9 @@ rtl
 .segment "CODE7"
 
 PreparePlayback:
-	jsr CopyCurrentSongToSpcBuffer
+	;jsr CopyCurrentSongToSpcBuffer
 	; TODO: If currently playing, don't transfer yet, wait till song stops
-	jsr TransferEntirePlaybackBufferToSpc
+	;jsr TransferEntirePlaybackBufferToSpc
 rts
 
 PhraseIndexWasChanged:
@@ -317,7 +333,7 @@ ShowCursor_long: jsr ShowCursor
 rtl
 ShowCursor:
 
-	lda #4
+	lda #5
 	sta CursorX
 	
 	lda CursorRow

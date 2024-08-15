@@ -177,6 +177,13 @@ LoadPalettes:
 	ldx #$20
 	ldy #.loword(PatternPaletteHighlight)
 	jsr loadPalette
+	
+	lda #$09
+	sta CGADDR
+	lda #$42
+	sta CGDATA
+	lda #$10
+	sta CGDATA
 
 rts
 
