@@ -2,9 +2,9 @@
 
 ;.include "brewsic-spc.s"
 
-.segment "RODATA4"
+.segment "SPCIMAGE"
 SpcImage:
 ;.incbin "brewsic.spc"
 ;.incbin "brewsic/frp.sfc.spc"
-.incbin "obj/bsdj.sfc.spc"
+.incbin "bin/bsdj.sfc.spc"
 SpcImageEnd:

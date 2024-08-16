@@ -189,7 +189,7 @@ CompilePatternToBuffer:
 	sta f:PatternOffsetReferences+3
 
 	phb
-	lda #^SONG
+	lda #^PHRASES
 	pha
 	plb
 	
@@ -225,7 +225,7 @@ CopyCurrentSongToSpcBuffer:
 
 
 	phb
-	lda #^SONG
+	lda #^SONG ; Song and chains in same bank
 	pha
 	plb
 	
@@ -383,6 +383,12 @@ CopyCurrentSongToSpcBuffer:
 			cpx #16
 		bne @channelLoop
 			
+		phb
+		seta8
+		lda #^PHRASES
+		pha
+		seta16
+		plb
 		lda @PhraseOfChannel+0
 		jsr @AddPhraseToIndex
 		lda @PhraseOfChannel+2
@@ -399,6 +405,7 @@ CopyCurrentSongToSpcBuffer:
 		jsr @AddPhraseToIndex
 		lda @PhraseOfChannel+14
 		jsr @AddPhraseToIndex
+		plb
 
 		dec PatternRowCounter
 		beq @endSongLoop
@@ -491,6 +498,7 @@ rtl
 		sta @ChainOffsetOfChannel,x
 		tay
 		lda CHAINS,Y
+		and #$ff
 		cmp #$ff
 		beq @silence
 rts
@@ -613,7 +621,7 @@ rts
 CompileSingleNoteBar:
 .a8
 	phb
-	lda #^SONG
+	lda #^PHRASES
 	pha
 	plb
 	

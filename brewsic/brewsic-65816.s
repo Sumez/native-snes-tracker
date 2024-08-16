@@ -541,7 +541,6 @@ sb_start:
 
 
 .segment "RODATA5"
-.export TEST_PATTERN = Image1
 Image1:
 .incbin "music/lucky.bin"
 Image1End:

@@ -5,14 +5,28 @@
   <Platform>Snes</Platform>
   <BuildConfiguration>
     <Settings>
-      <Name>BSDJ</Name>
-      <Filename>obj/bsdj.sfc</Filename>
-      <BuildPath>obj/obj</BuildPath>
-      <DebugFile>obj/bsdj.dbg</DebugFile>
-      <LinkerConfigFile>snes.cfg</LinkerConfigFile>
-      <MapFile>obj/bsdj.map.txt</MapFile>
+      <Name>HiRom</Name>
+      <Filename>bin/bsdj.sfc</Filename>
+      <BuildPath>bin/obj</BuildPath>
+      <DebugFile>bin/bsdj.dbg</DebugFile>
+      <LinkerConfigFile>hirom.cfg</LinkerConfigFile>
+      <MapFile>bin/bsdj.map.txt</MapFile>
       <Symbol>jTESTPATTERN=4</Symbol>
       <Symbol>fTESTCHANNEL=0</Symbol>
+      <Symbol>FASTTRANSFER</Symbol>
+      <Symbol>HIROM</Symbol>
+      <CalculateChecksum>true</CalculateChecksum>
+      <Custom>false</Custom>
+    </Settings>
+  </BuildConfiguration>
+  <BuildConfiguration>
+    <Settings>
+      <Name>LoRom</Name>
+      <Filename>bin/lorom.sfc</Filename>
+      <BuildPath>bin/obj</BuildPath>
+      <DebugFile>bin/lorom.dbg</DebugFile>
+      <LinkerConfigFile>snes.cfg</LinkerConfigFile>
+      <MapFile>bin/lorom.map.txt</MapFile>
       <Symbol>FASTTRANSFER</Symbol>
       <CalculateChecksum>true</CalculateChecksum>
       <Custom>false</Custom>
@@ -297,5 +311,10 @@
         <Value>0,0,0,0,255;3,218,185,152,255</Value>
       </Property>
     </Pipeline>
+  </File>
+  <File>
+    <Id>30</Id>
+    <RelativePath>README.md</RelativePath>
+    <Mode>Ignore</Mode>
   </File>
 </BrewmasterProject>

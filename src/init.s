@@ -29,10 +29,12 @@ MEMSIZE_8MB   = $0D  ; ExHiROM only: Tales of Phantasia, SF Alpha 2
 .segment "SNESHEADER"
 
 map_mode:
-;.byte MAPPER_LOROM|ROMSPEED_200NS
-.byte MAPPER_LOROM|ROMSPEED_120NS
+.ifdef HIROM
+	.byte MAPPER_HIROM|ROMSPEED_120NS
+.else
+	.byte MAPPER_LOROM|ROMSPEED_120NS
+.endif
 .byte $02   ; 00: no extra RAM; 02: RAM with battery
-;.byte MEMSIZE_256KB  ; ROM size (08-0C typical)
 .byte MEMSIZE_1MB  ; ROM size (08-0C typical)
 .byte MEMSIZE_64KB                  ; SRAM size
 .byte $01                   ; $01 = U.S.  $00 = Japan, that's all I know

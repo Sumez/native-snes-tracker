@@ -2,7 +2,7 @@
 .include "src/snes.inc"
 .smart
 
-.segment TextBank
+.segment "RODATA"
 TextAddresses:
 DialogChr:
 .incbin "gfx/font.chr"

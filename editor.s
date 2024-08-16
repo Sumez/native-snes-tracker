@@ -13,23 +13,35 @@ TilemapBuffer:
 UiTilemapBuffer:
 .res 32*32*2
 
-.segment SongDataSegment
-.assert * = $700000, error, "Song data must start at $0000 in sram for compatibility"
-;.segment "SRAM1"
-HEADER: .res $30 ; Bytes to spare
-TITLE: .res $40
-AUTHOR: .res $40
-SONG: .res $800 ; $0-FF, 8 channels per row
-;.segment "SRAM2"
-CHAINS: .res $2000 ; 2 bytes (phrase ref and transpose), 16 rows, $100 different chains of $20 each
-;.segment "SRAM3"
-PHRASES: .res $4000 ; 4 bytes (note, instr, command, cmdparam) * 16 rows. $100 different phrases of $40 each
-;PHRASES: .res $2000 ; 4 bytes (note, instr, command, cmdparam) * 16 rows. $100 different phrases of $40 each
-;.segment "SRAM4"
-;PHRASESp2: .res $2000
-;.segment "SRAM5"
-INSTRUMENTS: .res $100 ; ??
-META: .res $800 ; Future feature: custom meta data for song - colors to help with navigation etc.
+.ifdef HIROM
+
+	.segment "SRAM1"
+	.assert * = $306000, error, "Song data must start at $0000 in sram for compatibility"
+	HEADER: .res $30 ; Bytes to spare
+	TITLE: .res $40
+	AUTHOR: .res $40
+	SONG: .res $800 ; $0-FF, 8 channels per row
+	CHAINS: .res $1000 ; 2 bytes (phrase ref and transpose), 16 rows, $80 different chains of $20 each
+	.segment "SRAM2"
+	PHRASES: .res $2000 ; 4 bytes (note, instr, command, cmdparam) * 16 rows. $80 different phrases of $40 each
+	.segment "SRAM3"
+	INSTRUMENTS: .res $100 ; ??
+	META: .res $800 ; Future feature: custom meta data for song - colors to help with navigation etc.
+
+.else
+
+	.segment SongDataSegment
+	.assert * = $700000, error, "Song data must start at $0000 in sram for compatibility"
+	HEADER: .res $30 ; Bytes to spare
+	TITLE: .res $40
+	AUTHOR: .res $40
+	SONG: .res $800 ; $0-FF, 8 channels per row
+	CHAINS: .res $1000 ; 2 bytes (phrase ref and transpose), 16 rows, $100 different chains of $20 each
+	PHRASES: .res $2000 ; 4 bytes (note, instr, command, cmdparam) * 16 rows. $100 different phrases of $40 each
+	INSTRUMENTS: .res $100 ; ??
+	META: .res $800 ; Future feature: custom meta data for song - colors to help with navigation etc.
+
+.endif
 
 .segment "ZEROPAGE"
 ; Input handler pointers
@@ -206,7 +218,7 @@ LoadSong:
 	lda #$ff
 	ldx #0
 	:
-		sta SONG,X
+		sta f:SONG,X
 		inx
 		cpx #$800
 	bne :-
@@ -214,7 +226,7 @@ LoadSong:
 	lda #$ff
 	ldx #0
 	:
-		sta CHAINS,X
+		sta f:CHAINS,X
 		inx
 		cpx #$2000
 	bne :-
@@ -222,7 +234,7 @@ LoadSong:
 	lda #$ff
 	ldx #0
 	:
-		sta PHRASES,X
+		sta f:PHRASES,X
 		inx
 		cpx #$4000
 	bne :-
@@ -230,7 +242,7 @@ LoadSong:
 	lda #$ff
 	ldx #0
 	:
-		sta INSTRUMENTS,X
+		sta f:INSTRUMENTS,X
 		inx
 		cpx #$100
 	bne :-
@@ -238,7 +250,7 @@ LoadSong:
 	lda #$00
 	ldx #0
 	:
-		sta META,X
+		sta f:META,X
 		inx
 		cpx #$800
 	bne :-
@@ -248,25 +260,6 @@ LoadSong:
 
 	plb
 rts
-	; Doesn't work in SRAM
-	ldx #((WMDATA << 8 & $ff00)|DMA_CONST)
-	stx DMAMODE
-	ldx #.loword(DefaultChain)
-	stx DMAADDR
-	lda #^DefaultChain
-	sta DMAADDRBANK
-	ldx #$800
-	stx DMALEN
-
-	ldx #.loword(SONG)
-	stx WMADDL
-	lda #^SONG
-	sta WMADDH
-	
-	lda #%00000001
-	sta COPYSTART
-rts
-DefaultChain: .byte $FF
 
 .macro jumpTable TableReference
 	lda #0

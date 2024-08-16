@@ -40,7 +40,7 @@ CleanOamBuffer:
 	sta COPYSTART
 rts
 
-.segment "RODATA1"
+.segment "RODATA"
 CleanSprite:
 .repeat $200
 .byte 224

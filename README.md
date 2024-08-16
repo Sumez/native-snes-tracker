@@ -31,7 +31,7 @@
 - Companion software for adding custom samples
     - Ability to add as many samples as ExHiRom can fit
     - Manually pick which samples to include in a song in the song settings inside the tracker
-    - `Rewrite to use HiRom or ExHiRom`
+    - ~~`Rewrite to use HiRom or ExHiRom`~~ <sup>Done</sup>
 - Make various SNES specific features available, make controlling DSP registers more direct using commands
 - Meta data
     - Edit song and author name
@@ -48,4 +48,5 @@
 - Pitch modulation
 - Built-in sample synthesis
 - Hardware noise channel
+- Live mode
 - Pre-emphasize samples to counterbalance the SNES DSP's gaussian filter

@@ -63,26 +63,6 @@
 .global CalcCollisionDown, CalcCollisionRight, GetTilesBelow, GetTileInFront, InitializeBitMask
 
 
-
-.ifdef SHOOTER
-;Objects
-.global UpdateBullets, FireCountdown, FireAimedShot
-.global objectOffsetX
-;Sprites
-.global AddBulletSprite, DrawBigSpriteWithShadow, DrawGiantSpriteWithShadow
-;Backgrounds
-.global InitStgBgLayer, LoadStgPalettes
-; ?
-.global ScrollX, InitShooterStage, LoadShotMap, FirePlayerShot, UpdatePlayerShots, playerCollisionY, playerCollisionX
-.endif
-
-MapSize = 32*30
-.define TextBank "ROM10"
-.global InitDungeonStage, ScrollX
-.global PrintText
-.global BufferedInput, UpdateInputStates
-
-
 .define rgb(red,green, blue) (red / 8) | ((green/8) << 5 )| ((blue/8) << 10)
 
 State_Falling = %00000001

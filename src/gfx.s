@@ -1,7 +1,7 @@
 .include "global.inc"
 .include "src/snes.inc"
 
-.segment "RODATA7"
+.segment "CODE7"
 PatternPalette:
 .incbin "gfx/font.inc.0.pal"
 PatternPaletteHighlight:
