@@ -1,7 +1,7 @@
 .include "src/spc-ca65.inc"
 
 Channels = 8
-DirAddress = $1000
+SampleDirectoryAddress = $1100
 
 .segment "SPCZEROPAGE":zeropage
 Temp: .res $10
@@ -68,6 +68,7 @@ ChOrigPitchH: .res Channels
 ChCurrentInstrumentVolume: .res Channels
 ChVolumeEnvelopeL: .res Channels
 NoteOff: .res 1
+LoopToPattern: .res 1
 
 .segment "RODATA4"
 
@@ -81,8 +82,8 @@ SPC_DSPA	=0F2h
 SPC_DSPD	=0F3h
 SPC_PORT0	=0F4h ; i/o port0
 SPC_PORT1	=0F5h ; i/o port1
-SPC_PORT2	=0F6h ; i/o port2
-SPC_PORT3	=0F7h ; i/o port3
+SPC_PORT2	=0F6h ; i/o port2 - Reads command params, Writes current bar in current pattern
+SPC_PORT3	=0F7h ; i/o port3 - Reads command params, Writes 0xFF(?) after track is done playing (nothing set before first playback)
 SPC_FLAGS	=0F8h ; custom flags
 SPC_TIMER0	=0FAh ; timer0 setting
 SPC_TIMER1	=0FBh ; timer1 setting
@@ -173,7 +174,7 @@ dsp $71, $00
 
 
 dsp DSP_KOF, $00
-dsp DSP_DIR, (DirAddress >> 8)
+dsp DSP_DIR, (SampleDirectoryAddress >> 8)
 
 call !ResetDsp
 dsp DSP_FLG, $20
@@ -243,7 +244,10 @@ PlayMusic:
 	mov SPC_CONTROL,#$01
 	mov a,SPC_COUNTER0
 
-	; First tick, engage immediately to prevent "start lag"
+	; tell PORT3 that playback is active
+	mov SPC_PORT3, #0
+
+	; First tick, engage immediately to prevent "start lag",
 	mov a, #1
 	mov TickCountDown,a
 	call !TickModule
@@ -296,7 +300,7 @@ inc y
 inc y
 mov [@sfxIndexPointer]+Y, a
 	
-	mov a, !(DirAddress-1)
+	mov a, !(SampleDirectoryAddress-1)
 	lsr a ; = sample count
 	dec a ; sfx sample index
 
@@ -392,7 +396,7 @@ BeginTransfer:
 	mov a, SPC_PORT2
 	mov y, SPC_PORT3
 	movw Com_TransferAddress, ya
-	mov a, SPC_PORT1 ; Read again to ensure it's wasn't a dirty read
+	mov a, SPC_PORT1 ; Read again to ensure it wasn't a dirty read
 	mov SPC_PORT1, a ; Tell S-CPU we've received the message and are ready for the next word of data
 	inc a
 	mov Com_LastReceived, a ; Store n+1, because that's the next number we're expecting
@@ -482,10 +486,10 @@ BeginTransfer:
 ret
 
 LoadTrackDirectory:
-	mov a, #DirAddress & $ff
-	mov y, #DirAddress >> 8
+	mov a, #SampleDirectoryAddress & $ff
+	mov y, #SampleDirectoryAddress >> 8
 	movw <TrackDirectoryPointer, ya
-	mov a, !(DirAddress-1)
+	mov a, !(SampleDirectoryAddress-1)
 	asl a
 	mov y, #0
 	addw ya, TrackDirectoryPointer
@@ -558,6 +562,8 @@ LoadTrack:
 	
 	mov a, #0 ; Always start at the beginning
 	mov !CurrentOrderIndex, a
+	; TODO: Define loop by a loop-start index instead of a loop command in the end (just go back to alway $00 in the end)
+	mov !LoopToPattern, a
 	call !ResetPattern
 	inc PatternRowCounter ; Usually a new track is loaded AFTER counting down one row, so add +1 on the first pattern to acocunt for that
 ret
@@ -565,15 +571,23 @@ ret
 ResetPattern:
 	mov TickCountDown, TrackSpeed
 
-	mov y, !CurrentOrderIndex
 .ifdef TESTPATTERN
 	mov y, #TESTPATTERN
+.else
+	mov y, !CurrentOrderIndex
 .endif
 	mov a, [PatternLengthTable]+y
-	cmp a, #$00 ; TODO: Loop value?
-	bne :+
+	cmp a, #$00
+	bne :++
 		; Reached end of patterns
-		jmp !StopTrack
+		mov a, !LoopToPattern
+		cmp a, #$ff
+		bne :+
+			; No looping, end playback
+			jmp !StopTrack
+		:
+		mov !CurrentOrderIndex, a
+		jmp !ResetPattern
 	:
 	mov PatternRowCounter, a
 	
@@ -608,9 +622,10 @@ ret
 
 StopTrack:
 	;call !ResetDsp
-mov a, #$ff ; All keys off. No reason to reset dsp (just results in cut-off pops)
-mov SPC_DSPA, #DSP_KOF
-mov SPC_DSPD, a
+	mov a, #$ff ; All keys off. No reason to reset dsp (just results in cut-off pops)
+	mov SPC_PORT3, a ; Also set PORT3 to tell we are done playing
+	mov SPC_DSPA, #DSP_KOF
+	mov SPC_DSPD, a
 	mov x, #$ED ; force jumping back to regular wait loop
 	mov sp, x
 ret
@@ -649,11 +664,16 @@ TickModule:
 	dec TickCountDown
 	bne @applyEffects
 
+
+		@newBeat:
 		dec PatternRowCounter
 		bne :+
 			inc !CurrentOrderIndex
 			call !ResetPattern
 		:
+		mov a, PatternRowCounter
+		mov SPC_PORT2, a ; Tell active bar/beat to CPU, for CPU-controlled playback
+		
 		mov TickCountDown, TrackSpeed
 	
 		mov EffectCounter, #1
@@ -667,9 +687,7 @@ TickModule:
 .ifndef TESTCHANNEL
 		bpl :-
 .endif
-
-
-		
+	
 	@applyEffects:
 	mov y, #7; Channel #
 	@effectChannelLoop:
@@ -1579,6 +1597,6 @@ DspChannels:
 	.byte $00,$10,$20,$30,$40,$50,$60,$70
 
 .align $100
-.assert * = DirAddress, error, "Unaligned track data"
+.assert * = SampleDirectoryAddress, error, "Unaligned track data - Update directory address in both SPC and CPU code. Compiled track images will also not work anymore"
 
 .reloc

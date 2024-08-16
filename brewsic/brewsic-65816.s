@@ -9,7 +9,9 @@
 .import SpcImage:far, SpcImageEnd:far
 SpcImageSize = SpcImageEnd-SpcImage
 
-DirAddress = $1000
+.export SampleDirectoryAddress
+SampleDirectoryAddress = $1100
+
 SpcEntryPoint = $0200
 
 SfxOffset = $8000
@@ -59,7 +61,7 @@ Init:
 
 	jsr RunSpcCode
 
-	ldx #(DirAddress-1)
+	ldx #(SampleDirectoryAddress-1)
 	stx z:TransferDestination
 	lda #^Image1
 	ldx #.loword(Image1)
@@ -193,6 +195,9 @@ transfer:
 @customLoop = Temp+5
 	
 .ifdef FASTTRANSFER
+; Fast transfer relies on the CPU code being faster than SPC.
+; This should be no issue even on slowrom (needs confirmation),
+; but it's important to make sure the transfer isn't interrupted by IRQs!!
 
 	stx @sourceAddress
 
@@ -216,13 +221,16 @@ transfer:
 
 	;ldx #$0101 ; Begin transfer, start counting from 1, as it is the same as the command
 
-: inc LastCommByte
-lda LastCommByte
-cmp #$AB ; Since the ready code is ABCD, this is the one value we don't allow on port1
-beq :-
+	: inc LastCommByte
+	lda LastCommByte
+	cmp #$AB ; Since the ready code is ABCD, this is the one value we don't allow on port1 when beginning transfer
+	beq :-
+	cmp #$AA ; TODO: Or maybe this since it's being increased? Uh. Or maybe just start from a static value
+	beq :-
+
 xba
 lda #Command_Transfer ; Transfer command
-tax
+tax ; X now contains both transfer command, *and* the initial PORT1 check value (SPC code reads this, increments and sends back to tell when it's ready for the next block of 4 bytes)
 
 	stx PORT0
 	txa
@@ -293,7 +301,7 @@ tax
 		cpx #$ABCD ; Wait for SPC code to be ready for commands
 	bne :-
 	
-	ldx #(DirAddress-1)
+	ldx #(SampleDirectoryAddress-1)
 	stx PORT2
 	ldx #$0101 ; Begin transfer, start counting from 1, as it is the same as the command
 	stx PORT0

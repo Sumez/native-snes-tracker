@@ -6,7 +6,7 @@
 .define SongDataSegment "SRAM"
 
 ; Memory addresses
-.global SONG, CHAINS, PHRASES, INSTRUMENTS
+.global SONG, CHAINS, PHRASES_1, PHRASES_2, INSTRUMENTS
 .globalzp Input_CustomHandler, Input_NavigateIn, Input_NavigateBack, Input_MoveLeft, Input_MoveUp, Input_MoveRight, Input_MoveDown
 .globalzp Input_StartPlayback, OnPlaybackStopped
 .global IsPlaying, CompiledPattern, TilemapBuffer, UiTilemapBuffer, EditMode

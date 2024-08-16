@@ -26,6 +26,7 @@ PatternCommands: .res 16
 PatternCommandParams: .res 16
 CurrentPhraseIndex: .res 1
 CurrentPhraseIndexInSongData: .res 2
+SourcePointer: .res 3 ; far address source pointer necessary because phrase data is spread across multiple banks
 
 .segment "CODE6"
 
@@ -75,6 +76,7 @@ LoadView:
 rts
 
 LoadGlobalData:
+@sourcePointer = 0
 	sta CurrentPhraseIndex
 	; Copy selected phrase data to temp memory
 	seta16
@@ -86,47 +88,72 @@ LoadGlobalData:
 	asl
 	asl
 	asl
-	tax
+	sta CurrentPhraseIndexInSongData
+	and #$1FFF
+	pha
+	ldy #^PHRASES_1
+	ldx #.loword(PHRASES_1)
+	lda CurrentPhraseIndexInSongData
+	and #$2000
+	beq :+
+		ldy #^PHRASES_2
+		ldx #.loword(PHRASES_2)
+	:
 	seta8
-	stx CurrentPhraseIndexInSongData
-	ldy #0
+	tya
+	stx @sourcePointer
+	sta @sourcePointer+2
+	stx SourcePointer
+	sta SourcePointer+2
+	ldx #0
+	ply
 	@loop:
-		lda f:PHRASES+0,x
-		sta PatternInstruments,y
-		lda f:PHRASES+1,x
-		sta PatternCommands,y
-		lda f:PHRASES+2,x
-		sta PatternCommandParams,y
-		lda f:PHRASES+3,x
-		sta PatternNotes,y
-		inx
-		inx
-		inx
-		inx
+		lda [@sourcePointer],y
+		sta PatternInstruments,x
+		iny		
+		lda [@sourcePointer],y
+		sta PatternCommands,x
 		iny
-		cpy #$10
+		lda [@sourcePointer],y
+		sta PatternCommandParams,x
+		iny
+		lda [@sourcePointer],y
+		sta PatternNotes,x
+		iny
+		inx
+		cpx #$10
 	bne @loop	
 rtl
 UpdateGlobalData:
+@sourcePointer = 0
 	; Copy temp memory to selected phrase
 	; TODO: Update only currently selected bar
-	ldx CurrentPhraseIndexInSongData
-	ldy #0
+	ldx SourcePointer
+	lda SourcePointer+2
+	stx @sourcePointer
+	sta @sourcePointer+2
+	
+	ldx #0
+	seta16
+	lda CurrentPhraseIndexInSongData
+	and #$1FFF
+	tay
+	seta8
 	@loop:
-		lda PatternInstruments,y
-		sta f:PHRASES+0,x
-		lda PatternCommands,y
-		sta f:PHRASES+1,x
-		lda PatternCommandParams,y
-		sta f:PHRASES+2,x
-		lda PatternNotes,y
-		sta f:PHRASES+3,x
-		inx
-		inx
-		inx
-		inx
+		lda PatternInstruments,x
+		sta [@sourcePointer],y
 		iny
-		cpy #$10
+		lda PatternCommands,x
+		sta [@sourcePointer],y
+		iny
+		lda PatternCommandParams,x
+		sta [@sourcePointer],y
+		iny
+		lda PatternNotes,x
+		sta [@sourcePointer],y
+		iny
+		inx
+		cpx #$10
 	bne @loop
 rtl
 
@@ -325,7 +352,7 @@ NoteWasChanged:
 		seta16
 		and #$00ff
 		adc CurrentPhraseIndexInSongData ; should point to the block of 4 relevant bytes
-		tay ; [Y] tells where to read data from
+		tax ; [X] tells where to read data from
 		seta8
 		lda CurrentPhraseIndex ; [A] tells which phrase to look for in compiled song data
 		jsr UpdateNoteInPlayback
@@ -595,6 +622,6 @@ rts
 
 StartPlayback:
 	lda CurrentPhraseIndex
-	ldy CurrentPhraseIndexInSongData
+	ldx CurrentPhraseIndexInSongData
 	jsr StartTestPatternPlayback
 rts

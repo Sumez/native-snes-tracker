@@ -21,12 +21,19 @@ UiTilemapBuffer:
 	TITLE: .res $40
 	AUTHOR: .res $40
 	SONG: .res $800 ; $0-FF, 8 channels per row
-	CHAINS: .res $1000 ; 2 bytes (phrase ref and transpose), 16 rows, $80 different chains of $20 each
 	.segment "SRAM2"
-	PHRASES: .res $2000 ; 4 bytes (note, instr, command, cmdparam) * 16 rows. $80 different phrases of $40 each
+	CHAINS: .res $2000 ; 2 bytes (phrase ref and transpose), 16 rows, $80 different chains of $20 each
 	.segment "SRAM3"
+	PHRASES_1: .res $2000 ; 4 bytes (note, instr, command, cmdparam) * 16 rows. $80 different phrases of $40 each
+	.segment "SRAM4"
+	PHRASES_2: .res $2000 ; 4 bytes (note, instr, command, cmdparam) * 16 rows. $80 different phrases of $40 each
+	.segment "SRAM5"
 	INSTRUMENTS: .res $100 ; ??
 	META: .res $800 ; Future feature: custom meta data for song - colors to help with navigation etc.
+	.segment "SRAM6"
+	PHRASES_3: .res $2000 ; For future expansion
+	.segment "SRAM7"
+	PHRASES_4: .res $2000
 
 .else
 
@@ -36,10 +43,13 @@ UiTilemapBuffer:
 	TITLE: .res $40
 	AUTHOR: .res $40
 	SONG: .res $800 ; $0-FF, 8 channels per row
-	CHAINS: .res $1000 ; 2 bytes (phrase ref and transpose), 16 rows, $100 different chains of $20 each
-	PHRASES: .res $2000 ; 4 bytes (note, instr, command, cmdparam) * 16 rows. $100 different phrases of $40 each
+	CHAINS: .res $2000 ; 2 bytes (phrase ref and transpose), 16 rows, $100 different chains of $20 each
+	PHRASES_1: .res $2000 ; 4 bytes (note, instr, command, cmdparam) * 16 rows. $100 different phrases of $40 each
+	PHRASES_2: .res $2000 ; 4 bytes (note, instr, command, cmdparam) * 16 rows. $100 different phrases of $40 each
 	INSTRUMENTS: .res $100 ; ??
 	META: .res $800 ; Future feature: custom meta data for song - colors to help with navigation etc.
+	PHRASES_3: .res $2000
+	PHRASES_4: .res $2000
 
 .endif
 
@@ -234,9 +244,33 @@ LoadSong:
 	lda #$ff
 	ldx #0
 	:
-		sta f:PHRASES,X
+		sta f:PHRASES_1,X
 		inx
-		cpx #$4000
+		cpx #$2000
+	bne :-
+
+	lda #$ff
+	ldx #0
+	:
+		sta f:PHRASES_2,X
+		inx
+		cpx #$2000
+	bne :-
+
+	lda #$ff
+	ldx #0
+	:
+		sta f:PHRASES_3,X
+		inx
+		cpx #$2000
+	bne :-
+
+	lda #$ff
+	ldx #0
+	:
+		sta f:PHRASES_4,X
+		inx
+		cpx #$2000
 	bne :-
 	
 	lda #$ff

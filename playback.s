@@ -117,7 +117,8 @@ jmp spcTransfer
 ; X = Offset to transfer from
 ; Y = Bytes to transfer
 spcTransfer:
-@patternDataStartInSpcMemory = $6098 ; Needs to be dynamic, determined after transfer of samples
+.import SampleDirectoryAddress
+@patternDataStartInSpcMemory = SampleDirectoryAddress + $5098 ; Needs to be dynamic, determined after transfer of samples
 	
 	seta16
 	txa
@@ -142,11 +143,11 @@ spcTransfer:
 rts
 
 
-UpdateNoteInPlayback:
+UpdateNoteInPlayback: ; !!! Needs to preserve [X] into CompileSingleNoteBar
 	sta PatternToFind
-	ldx #0
+	ldy #0
 	@patternFindLoop:
-		lda PatternOffsetReferences,X
+		lda PatternOffsetReferences,Y
 		cmp #$ff
 		bne :+
 			; Reached end. Not found. Do nothing
@@ -159,9 +160,9 @@ UpdateNoteInPlayback:
 			lda NoteDataOffsetInPhrase
 			seta16
 			and #$00ff
-			adc PatternOffsetReferences+1,X
+			adc PatternOffsetReferences+1,Y
 			inc ; Skip the pattern's header byte
-			tax
+			tay ; Tells compile code where to write to in buffer
 			adc #18
 			pha ; need full index for SPC transfer later
 			seta8
@@ -172,16 +173,16 @@ UpdateNoteInPlayback:
 			jmp spcTransfer
 			; Returns
 		:
-		inx
-		inx
-		inx
+		iny
+		iny
+		iny
 	bra @patternFindLoop
 
 
 
 .segment "CODE6"
 
-CompilePatternToBuffer:	
+CompilePatternToBuffer:	; !!! Needs to preserve [X] into CompileSinglePattern
 	
 	;Update reference list to play back changes while phrase is edited
 	sta f:PatternOffsetReferences
@@ -189,7 +190,7 @@ CompilePatternToBuffer:
 	sta f:PatternOffsetReferences+3
 
 	phb
-	lda #^PHRASES
+	lda #^CompiledPattern
 	pha
 	plb
 	
@@ -200,11 +201,9 @@ CompilePatternToBuffer:
 	sta f:CompiledPattern+PatternReferenceOffset
 	
 	; Load phrase into test pattern
-	tax
+	tay
 	jsr CompileSinglePattern
 	
-	lda #$0002 ; Insert loop-back commands on final bar ; TODO: This overrides any commands inserted by user, so expand the pattern-length data to have a loop feature instead
-	sta f:CompiledPattern+18-3,X ; Edits the last bar in data
 	seta8
 	
 	plb
@@ -225,7 +224,7 @@ CopyCurrentSongToSpcBuffer:
 
 
 	phb
-	lda #^SONG ; Song and chains in same bank
+	lda #^CompiledPattern
 	pha
 	plb
 	
@@ -236,17 +235,17 @@ CopyCurrentSongToSpcBuffer:
 	stz @orderLengthSize
 
 	; Detect the channel with the longest series of chain rows playing before looping the entire channel
-	ldx #0
+	ldy #0
 	@channelLoopX:
 		stz @currentChannelLength
-		phx
+		phy
 
-		txa
-		xba
-		tay
-		sty SongRowOfChannel
+		tya ; Y counds channel
+		xba ; Channel index is 0x00
+		tax ; X is index in SONG data
+		stx z:SongRowOfChannel
 		@songRowLoopX:
-			lda SONG,Y
+			lda f:SONG,X
 			and #$ff
 			cmp #$ff
 			beq @endChannel
@@ -256,22 +255,22 @@ CopyCurrentSongToSpcBuffer:
 			asl
 			asl
 			asl
-			tay
-			ldx #16
+			tax ; index in CHAINS data
+			ldy #16
 			:
-				lda CHAINS,Y
+				lda f:CHAINS,X
 				and #$ff
 				cmp #$ff
 				beq @endChain
 				inc @currentChannelLength
-				iny
-				iny
-				dex
+				inx
+				inx
+				dey
 			bne :-
 			@endChain:
-			inc SongRowOfChannel
-			lda SongRowOfChannel
-			tay
+			inc z:SongRowOfChannel
+			lda z:SongRowOfChannel
+			tax
 			and #$ff
 		bne @songRowLoopX
 	
@@ -282,9 +281,9 @@ CopyCurrentSongToSpcBuffer:
 			sta @orderLengthSize
 		:
 		
-		plx
-		inx
-		cpx #8
+		ply
+		iny
+		cpy #8
 	bne @channelLoopX
 	
 	
@@ -318,19 +317,19 @@ CopyCurrentSongToSpcBuffer:
 	ldx #0
 	:
 		lda f:TestPatternSource,X
-		sta f:CompiledPattern,X
+		sta CompiledPattern,X
 		inx
 		cpx #18 ; Header length
 	bne :-
 	stx CurrentCompileIndex
 
 	; PATTERN REFERENCES
-	ldx #0
+	ldy #0
 	:
 		jsr @InitiateChannelIndexes
-		inx
-		inx
-		cpx #16
+		iny
+		iny
+		cpy #16
 	bne :-
 	
 	lda PatternRowCounter
@@ -340,24 +339,25 @@ CopyCurrentSongToSpcBuffer:
 	:
 	@rowLoop:
 	
-		ldx #0
+		ldy #0 ; Channel index (x2)
 		@channelLoop:
-			ldy @ChainOffsetOfChannel,X
+			ldx z:@ChainOffsetOfChannel,Y
 			bpl :+
 				; Skip entire channel
-				lda #$ff
-				sta @PhraseOfChannel,X
+				ldx #$ff
+				stx z:@PhraseOfChannel,Y
 				jmp @nextChannel
 			:
-			lda CHAINS,Y
+			lda f:CHAINS,X
 			and #$ff
 			cmp #$ff
 			; TODO: !!!!!!!!!!!!!! IMPORTANT !!!!!!!!!!!!! ALSO MOVE TO NEXT SONG ROW AFTER 16 CHAIN ROWS
 			bne :++
 				; Move to next song row
-				inc SongRowOfChannel,X
-				ldy SongRowOfChannel,X
-				lda SONG,Y
+				ldx z:SongRowOfChannel,Y
+				inx
+				stx z:SongRowOfChannel,Y
+				lda f:SONG,X
 				and #$ff
 				cmp #$ff
 				bne :+
@@ -370,25 +370,23 @@ CopyCurrentSongToSpcBuffer:
 				asl
 				asl
 				asl
-				sta @ChainOffsetOfChannel,X
+				tax
+				stx z:@ChainOffsetOfChannel,Y
 				bra @channelLoop
 			:
-			sta @PhraseOfChannel,X
-			inc @ChainOffsetOfChannel,X
-			inc @ChainOffsetOfChannel,X
+			tax
+			stx z:@PhraseOfChannel,Y
+			ldx z:@ChainOffsetOfChannel,Y
+			inx
+			inx
+			stx z:@ChainOffsetOfChannel,Y
 			
 			@nextChannel:
-			inx
-			inx
-			cpx #16
+			iny
+			iny
+			cpy #16
 		bne @channelLoop
 			
-		phb
-		seta8
-		lda #^PHRASES
-		pha
-		seta16
-		plb
 		lda @PhraseOfChannel+0
 		jsr @AddPhraseToIndex
 		lda @PhraseOfChannel+2
@@ -405,7 +403,6 @@ CopyCurrentSongToSpcBuffer:
 		jsr @AddPhraseToIndex
 		lda @PhraseOfChannel+14
 		jsr @AddPhraseToIndex
-		plb
 
 		dec PatternRowCounter
 		beq @endSongLoop
@@ -413,27 +410,27 @@ CopyCurrentSongToSpcBuffer:
 		
 	@endSongLoop:
 	
-	ldx CurrentCompileIndex
+	ldy CurrentCompileIndex
 	lda #$ffff ; End of pattern refs
-	sta f:CompiledPattern,X
-	inx
-	inx
+	sta CompiledPattern,Y
+	iny
+	iny
 	lda #16 ; This tracker only makes 16-bar patterns
-	ldy @orderLengthSize
+	ldx @orderLengthSize
 	:
-		sta f:CompiledPattern,X
-		inx
-		dey
+		sta CompiledPattern,Y
+		iny
+		dex
 	bne :-
 	lda #0 ; End of pattern lengths
-	sta f:CompiledPattern,X
-	inx
+	sta CompiledPattern,Y
+	iny
 	lda #$ffff ; Empty macro table
-	sta f:CompiledPattern,X
-	inx
-	inx
+	sta CompiledPattern,Y
+	iny
+	iny
 	
-	ldy #0 ; 6 hardcoded instruments so far
+	ldx #0 ; 6 hardcoded instruments so far
 	:
 ;$01 ; sample
 ;$FFF7 ; pitch adjust
@@ -441,28 +438,25 @@ CopyCurrentSongToSpcBuffer:
 ;$A0 ; volume
 ;$0000 ; volume envelope address
 ;0 ; unused
-		phx
-		tyx
 		lda f:DELETEtestinstruments,X
-		plx
 		and #$00FF
 		ora #$F700
-		sta f:CompiledPattern+0,X
+		sta CompiledPattern+0,Y
 		lda #$00FF
-		sta f:CompiledPattern+2,X
+		sta CompiledPattern+2,Y
 		lda #$00A0
-		sta f:CompiledPattern+4,X
+		sta CompiledPattern+4,Y
 		lda #$0000
-		sta f:CompiledPattern+6,X
-		txa
+		sta CompiledPattern+6,Y
+		tya
 		clc
 		adc #8
-		tax
-		iny
-		cpy #6
+		tay
+		inx
+		cpx #6
 	bne :-
 	
-	stx CurrentCompileIndex
+	sty CurrentCompileIndex
 	
 	lda CurrentCompileIndex
 	sec
@@ -481,12 +475,12 @@ rtl
 
 @InitiateChannelIndexes:
 .a16
-	txa
+	tya
 	xba
 	lsr
-	sta SongRowOfChannel,x
-	tay	
-	lda SONG,Y
+	tax
+	stx z:SongRowOfChannel,y
+	lda f:SONG,X
 	and #$ff
 	cmp #$ff
 	beq @silence
@@ -495,16 +489,16 @@ rtl
 		asl
 		asl
 		asl
-		sta @ChainOffsetOfChannel,x
-		tay
-		lda CHAINS,Y
+		tax
+		stx z:@ChainOffsetOfChannel,y
+		lda f:CHAINS,X
 		and #$ff
 		cmp #$ff
 		beq @silence
 rts
 	@silence:
-		lda #$8000 ; Indicates silent channel
-		sta @ChainOffsetOfChannel,x
+		ldx #$8000 ; Indicates silent channel
+		stx z:@ChainOffsetOfChannel,y
 rts
 
 @AddPhraseToIndex:
@@ -517,11 +511,11 @@ rts
 	:
 		jsr @EnsurePatternOffset
 	:
-	ldx CurrentCompileIndex
-	sta f:CompiledPattern,X
-	inx
-	inx
-	stx CurrentCompileIndex
+	ldy CurrentCompileIndex
+	sta CompiledPattern,y
+	iny
+	iny
+	sty CurrentCompileIndex
 rts
 
 @EnsurePatternOffset:
@@ -562,15 +556,15 @@ rts
 
 @AddEmptyPattern:
 .a16
-	ldx CurrentPatternOffset
-	stx EmptyPatternOffset
+	ldy CurrentPatternOffset
+	sty EmptyPatternOffset
 	
 	lda #$80|16 ; 16 silent rows
-	sta f:CompiledPattern+18,X ; Remember, when using the pattern offset, add 18 to account for header
-	inx
-	stx CurrentPatternOffset
+	sta CompiledPattern+18,Y ; Remember, when using the pattern offset, add 18 to account for header
+	iny
+	sty CurrentPatternOffset
 rts
-@AddPattern:
+@AddPattern: ; [A] = Phrase index
 .a16
 	asl
 	asl
@@ -578,80 +572,107 @@ rts
 	asl
 	asl
 	asl
-	tay
+	tax
 
-	ldx CurrentPatternOffset
+	ldy CurrentPatternOffset
 	
-CompileSinglePattern:
-	lda #15
-	sta f:CompiledPattern+18,X ; Remember, when using the pattern offset, add 18 to account for header
-	inx
+	
+	CompileSinglePattern:
+	lda #15 ; block header byte (15 = 16 uncompressed bars)
+	sta CompiledPattern+18,Y ; Remember, when using the pattern offset, add 18 to account for header
+	iny
 
 	inc
 	sta BarCounter
 
-	@patternLoop:
-		lda PHRASES+2,Y
-		sta f:CompiledPattern+18+2,X
+	txa
+	and #$2000
+	bne :+
+		; PHRASES_1 loop
+;		txa
+;		and #$1fff
+;		tax
+		@patternLoop1:
+			jsr CopyPhraseFromBank1
+			iny
+			iny
+			iny
+			iny
+			inx
+			inx
+			inx
+			inx
+			dec BarCounter
+		bne @patternLoop1
+		sty CurrentPatternOffset
+	rts
+	:
+		; PHRASES_2 loop
+		txa
+		and #$1fff
+		tax
+		@patternLoop2:
+			jsr CopyPhraseFromBank2
+			iny
+			iny
+			iny
+			iny
+			inx
+			inx
+			inx
+			inx
+			dec BarCounter
+		bne @patternLoop2
+		sty CurrentPatternOffset
+	rts
+	
+.macro CopyNotesFromPhraseToCompiledPattern SOURCE
+		lda f:SOURCE+2,X
+		sta CompiledPattern+18+2,Y
 		and #$ff00 ; Check if note value is $ff
 		cmp #$ff00
 		bne :+
 			lda #$0080
-			sta f:CompiledPattern+18,X ; Then store $80 in instrument byte
+			sta CompiledPattern+18,Y ; Then store $80 in instrument byte
 			bra :++
 		:
-			lda PHRASES+0,Y
+			lda f:SOURCE+0,X
 			ora #$0080 ; Always command data (even when 0), ensures constant pattern size
 			and #$00ff ; Unset command (TODO: If high byte is $FF)
-			sta f:CompiledPattern+18,X
+			sta CompiledPattern+18,Y
 		:
-		inx
-		inx
-		inx
-		inx
-		iny
-		iny
-		iny
-		iny
-		dec BarCounter
-	bne @patternLoop
-	stx CurrentPatternOffset
+.endmacro
+CopyPhraseFromBank1:
+	CopyNotesFromPhraseToCompiledPattern PHRASES_1
+rts
+CopyPhraseFromBank2:
+	CopyNotesFromPhraseToCompiledPattern PHRASES_2
 rts
 
 CompileSingleNoteBar:
 .a8
 	phb
-	lda #^PHRASES
+	lda #^CompiledPattern
 	pha
 	plb
 	
 seta16
-	lda f:CompiledPattern+18+1,X
-	pha
 
-	; TODO: Should probably be macro instead of copied code
-	lda PHRASES+2,Y
-	sta f:CompiledPattern+18+2,X
-	and #$ff00 ; Check if note value is $ff
-	cmp #$ff00
+	txa ; X has index into PHRASES, $2000 is the boundary that determines bank 1 or 2
+	and #$2000
 	bne :+
-		lda #$0080
-		sta f:CompiledPattern+18,X ; Then store $80 in instrument byte
+		;txa
+		;and #$1fff
+		;tax
+		jsr CopyPhraseFromBank1
 		bra :++
 	:
-		lda PHRASES+0,Y
-		ora #$0080 ; Always command data (even when 0), ensures constant pattern size
-		and #$00ff ; Unset command (TODO: If high byte is $FF)
-		sta f:CompiledPattern+18,X
+		txa
+		and #$1fff
+		tax
+		jsr CopyPhraseFromBank2
 	:
 
-	; Just in case we overwrote the loop command, put it back in
-	;lda #$0002 ; Insert loop-back commands on final bar ; TODO: This overrides any commands inserted by user, so expand the pattern-length data to have a loop feature instead
-	pla
-	cmp #$0002
-	bne :+
-		sta f:CompiledPattern+18+1,X
-	:
 seta8
 
 	plb
