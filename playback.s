@@ -392,6 +392,10 @@ CopyCurrentSongToSpcBuffer:
 	ldy #0
 	:
 		jsr InitiateChannelIndexes
+		ldx z:SongRowOfChannel,Y
+		dex ; channel progress always starts at the "end" of a chain, so decrease X once, so when the next song row is loaded, it will be the first
+		stx z:SongRowOfChannel,Y
+
 		iny
 		iny
 		cpy #16
@@ -537,6 +541,16 @@ CompileSongRowToBuffer:
 			stx z:PhraseOfChannel,Y
 			bra @nextChannel
 		:
+		
+		; Check if we reached end of chain
+		txa
+		and #$6 ; just the 00-1F index into the channel
+		bne :+
+			; Load next chain for channel
+			jsr MoveChannelToNextRowOfSong
+		:
+
+		ldx z:ChainOffsetOfChannel,Y
 		lda f:CHAINS,X
 		and #$ff
 		cmp #$ff
@@ -551,13 +565,7 @@ CompileSongRowToBuffer:
 		inx
 		inx
 		stx z:ChainOffsetOfChannel,Y
-		txa
-		and #$1F ; just the 00-1F index into the channel
-		bne :+
-			; If 0, read next row from song now
-			jsr MoveChannelToNextRowOfSong
-		:
-		
+				
 		@nextChannel:
 		iny
 		iny
