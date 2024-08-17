@@ -4,10 +4,10 @@
 
 - Revised CPU controlled playback
     - Start playback from any location in song
-    - Pointer showing where in the song you are
-    - Edit song, chains, etc. while playing, with immediate feedback
-    - `Sound driver sending data back telling where in the current phrase it is`
-    - `Only transfer one phrase per channel at a time to the APU, buffer one beat before it changes in SPC code`
+    - ~~Pointer showing where in the song you are~~ <sup>Done</sup>
+    - ~~Edit song, chains, etc. while playing, with immediate feedback~~ <sup>Done</sup>
+    - ~~`Sound driver sending data back telling where in the current phrase it is`~~ <sup>Done</sup>
+    - ~~`Only transfer one phrase per channel at a time to the APU, buffer one beat before it changes in SPC code`~~ <sup>Done</sup>
 - Improved navigation
     - Show adjacent views (chain preview from song view - chain and phrase are always visible at the same time)
     - "Channel bar" in the top, facilitates navigating between channels using L/R buttons (probably)
@@ -38,7 +38,7 @@
     - Assign name, and icon or color to instruments. Assign custom color to phrases and chains for easy recognition
 - Simple view that vizualises APU memory used in both compressed and uncompressed form
     - Chain support in sound driver, handle looping from song data
-    - `Generated compressed song data from tracker. Use note progression macros and silent blocks`
+    - `Generate compressed song data from tracker. Use note progression macros and silent blocks`
 
 ### Long term goals:
 

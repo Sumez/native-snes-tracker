@@ -66,6 +66,7 @@ LoadView:
 	lda CurrentPhraseIndex
 	jsl WriteTilemapHeaderId
 	jsl WritePatternTilemapBuffer
+	jsl UpdateHighlight_long
 	jsl ShowCursor_long
 
 	;TODO: DELETE
@@ -625,3 +626,23 @@ StartPlayback:
 	ldx CurrentPhraseIndexInSongData
 	jsr StartTestPatternPlayback
 rts
+
+.export Pattern_UpdateBeatHighlight = UpdateBeatHighlight
+UpdateHighlight_long: jsr UpdateBeatHighlight
+rtl
+UpdateBeatHighlight:
+	ldy #0
+	lda CurrentPhraseIndex
+	:
+		cmp Playback_CurrentPhraseOfChannel,y
+		bne :+
+			lda Playback_CurrentBeatRow
+			clc
+			adc #4
+			jmp HighlightRow
+		:
+		iny
+		cpy #8
+	bne :--
+	lda #$ff
+jmp HighlightRow

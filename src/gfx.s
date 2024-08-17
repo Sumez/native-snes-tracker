@@ -184,6 +184,17 @@ LoadPalettes:
 	sta CGDATA
 	lda #$10
 	sta CGDATA
+	lda #$28
+	sta CGDATA
+	lda #$41
+	sta CGDATA
+
+	lda #$96
+	sta CGADDR
+	lda #$69
+	sta CGDATA
+	lda #$69
+	sta CGDATA
 
 rts
 

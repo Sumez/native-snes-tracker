@@ -22,6 +22,7 @@ NMITEST: .res 2
 .import AsciiGfx
 .importzp playerFrameIndex
 .import LoadFromTileBuffer
+.import Vfx_Update_Vblank
 .import RefreshOam
 nmi_handler:
 	phb
@@ -40,37 +41,15 @@ stz NMITEST
 
 	lda #FORCEBLANK
 	sta PPUBRIGHT
+	
 
-	lda IsPlaying
-	asl
-	asl
-	asl
-	asl
-	asl
-	stz CGADDR
-	stz CGDATA
-	sta CGDATA
-	bne :+
-		lda #$09
-		sta CGADDR
-		lda #$42
-		sta CGDATA
-		lda #$10
-		sta CGDATA
-		bra :++
-	:
-		lda #$09
-		sta CGADDR
-		lda #$84
-		sta CGDATA
-		lda #$20
-		sta CGDATA
-	:
 
 
 .import CopyEntireTilemap, CopyTilemapToUiLayer
 jsl CopyEntireTilemap ; TODO: just queue updated rows?
-;jsl CopyTilemapToUiLayer
+jsl CopyTilemapToUiLayer
+
+	jsr Vfx_Update_Vblank
 
 	lda RefreshOam
 	beq :+
@@ -83,15 +62,14 @@ jsl CopyEntireTilemap ; TODO: just queue updated rows?
 
 
 lda ScrollY
-sta BG1SCROLLY
-lda ScrollY+1
-sta BG1SCROLLY
-seta16
-lda #0
-seta8
 sta BG2SCROLLY
 xba
+lda ScrollY+1
 sta BG2SCROLLY
+xba
+sta BG3SCROLLY
+xba
+sta BG3SCROLLY
 
 
 lda #$0F

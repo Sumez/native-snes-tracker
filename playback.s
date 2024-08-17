@@ -4,7 +4,9 @@
 
 .importzp BrewsicTransferDestination
 .import BrewsicPlayTrack, BrewsicTransfer, BrewsicPlaySound, BrewsicStopTrack
+.import Song_UpdateHighlight, Chain_UpdateHighlight, Pattern_UpdateBeatHighlight
 
+.export Playback_Update = Update
 .export PrepareTestPatternPlayback, StartTestPatternPlayback, UpdateNoteInPlayback, NoteDataOffsetInPhrase
 .export StopPlayback = BrewsicStopTrack
 .export SwitchToSingleNoteMode, TransferSingleNoteToSpcAndPlay
@@ -16,8 +18,14 @@ QueuePreparePlayback: .res 1
 
 ; TODO: Max of 16 possible phrases at a time when continuous pattern transfer is implemented
 ; Maybe two lists, so it's quicker to erase the old one when buffering new phrase patterns
-PatternOffsetReferences: .res (3 * $ff)+1 ; $FF possible phrases, 3 bytes per entry, 1 added byte for $FF in the very end
+PatternOffsetReferences: .res (3 * 8)+1 ; 8 possible phrases on a single song row, 3 bytes per entry, 1 added byte for $FF in the very end
+PatternOffsetReferencesAlternating: .res (3 * 8)+1 ; Alternating table to use, to avoid overriding patterns currently played (probably not necessary, but just to be safe)
 NoteDataOffsetInPhrase: .res 1
+
+Playback_CurrentBeatRow: .res 1
+Playback_CurrentPhraseOfChannel: .res 8 ; Keep this in memory until bar 0 of the next phrase, to avoid referencing the currently *buffered* phrase
+;Playback_CurrentChainRowOfChannel: .res 8
+Playback_CurrentSongRowOfChannel = SongRowOfChannel
 
 .segment "ZEROPAGE"
 PatternToFind: .res 2
@@ -25,15 +33,79 @@ BarCounter = PatternToFind ; Reuse this variable since the two routines always r
 CurrentCompileIndex: .res 2
 CurrentPatternOffset: .res 2
 EmptyPatternOffset: .res 2
-PatternRowCounter: .res 2
+FirstRowPatternOffset: .res 2
+SecondRowPatternOffset: .res 2
+SecondRowPatternEnd: .res 2
+PatternIndexOffset: .res 2
 
 SongRowOfChannel: .res $10
+ChainOffsetOfChannel: .res $10 ; row that will be read when NEXT phrase starts
+PhraseOfChannel: .res $10
+Playback_CurrentChainOffsetOfChannel: .res $10 ; Caches the last actually read row
+PatternOffsetTablePointer: .res 2
 
 
 DELETEvariables: .res 6
 
 
 .segment "CODE7"
+
+Update:
+@barsRemaining = 0
+
+	lda IsPlaying
+	beq @return
+
+	ldx APU2
+	dex ; If still playing, and on the last bar, APU2 will read 1, and APU3 will read 0, so one DEX will reach zero
+	stx @barsRemaining ; 0-F
+	lda #$0F
+	sec
+	sbc @barsRemaining
+	cmp Playback_CurrentBeatRow
+	beq @return
+		; Row changed
+		sta Playback_CurrentBeatRow
+		lda @barsRemaining
+		bne :+
+		
+			; Last bar of phrase. Compile and push next phrases to APU memory, unless just looping a phrase
+			bit IsPlaying ; if bit 7 is 1, either a song or phrase is playing
+			bpl :+
+				jsr PrepareNextRowInSong
+
+		:
+
+		lda Playback_CurrentBeatRow
+		bne :+
+			; First row. Update indicator of active phrase or chain on chain or song views here
+			; Copy buffered phrase indexes to active phrase indexes
+			ldx #0
+			txy
+			@smallLoop:
+				lda PhraseOfChannel+0,x
+				sta Playback_CurrentPhraseOfChannel+0,y
+				inx
+				inx
+				iny
+				cpy #8
+			bne @smallLoop
+			
+			jsr Song_UpdateHighlight
+			jsr Chain_UpdateHighlight
+		:
+		jsr Pattern_UpdateBeatHighlight ; Update pattern highlight every beat
+
+
+		;lda Playback_CurrentBeatRow
+		;and #3
+		;bne @return
+		;	; Every 0, 4, 8, 12
+		;	jsr Bop
+
+	@return:
+rts
+
 
 PrepareTestPatternPlayback:
 	lda IsPlaying
@@ -56,8 +128,30 @@ CopyTestPatternsToSpcBuffer:
 rts
 
 StartTestPatternPlayback:
+	;Update the "current phrase" for playback visual feedback
+	sta PhraseOfChannel
+	;Also update reference list to play back changes while phrase is edited
+	sta PatternOffsetReferences
+	ldy #0
+	sty PatternOffsetTablePointer ; And make sure we know to just look in the first table
+	lda #$ff
+	sta PatternOffsetReferences+3 ; End of offset refs
+	
+	sta PhraseOfChannel+2 ; Nothing on this channel
+	sta PhraseOfChannel+4 ; etc.
+	sta PhraseOfChannel+6
+	sta PhraseOfChannel+8
+	sta PhraseOfChannel+10
+	sta PhraseOfChannel+12
+	sta PhraseOfChannel+14
+
+	lda #1 ; 1 indicates playing 1 pattern looped
+	sta IsPlaying
+	lda #$ff
+	jsr HighlightRow ; Highlight no rows until a view decides to
 	jsl CompilePatternToBuffer
-jmp TransferEntirePlaybackBufferToSpcAndPlay
+	jsr TransferEntirePlaybackBufferToSpcAndPlay
+rts
 
 SwitchToSingleNoteMode:
 
@@ -86,7 +180,16 @@ SwitchToSingleNoteMode:
 	jsr TransferPatternReferencesToSpc
 rts
 
+PrepareNextRowInSong:
+	jsl CompileNextRowInSong
+	ldy SecondRowPatternEnd ; TODO: Instead of transfering everything, break it into small bits to prevent halting the song for a full 1+ frame
+jmp TransferPlaybackBufferToSpc
+
 PlayFullSong:
+	lda #$ff ; $ff indicates playing full song is playing. $80 indicates just looping one chain
+	sta IsPlaying
+	jsr HighlightRow ; Highlight no rows until a view decides to
+
 	jsl CopyCurrentSongToSpcBuffer
 jmp TransferEntirePlaybackBufferToSpcAndPlay
 
@@ -101,6 +204,8 @@ TransferSingleNoteToSpcAndPlay:
 	lda #0
 jmp BrewsicPlayTrack
 TransferEntirePlaybackBufferToSpcAndPlay:
+lda #$ff
+sta Playback_CurrentBeatRow ; TODO: Initiate all three Arrow data values depending on how playback was started
 	seta16
 	lda CurrentPatternOffset
 	clc
@@ -144,8 +249,10 @@ rts
 
 
 UpdateNoteInPlayback: ; !!! Needs to preserve [X] into CompileSingleNoteBar
+
 	sta PatternToFind
-	ldy #0
+
+	ldy PatternOffsetTablePointer ; Only need to look in the latest buffered row
 	@patternFindLoop:
 		lda PatternOffsetReferences,Y
 		cmp #$ff
@@ -171,7 +278,6 @@ UpdateNoteInPlayback: ; !!! Needs to preserve [X] into CompileSingleNoteBar
 			plx ; Start offset
 			ldy #4 ; Size
 			jmp spcTransfer
-			; Returns
 		:
 		iny
 		iny
@@ -184,11 +290,6 @@ UpdateNoteInPlayback: ; !!! Needs to preserve [X] into CompileSingleNoteBar
 
 CompilePatternToBuffer:	; !!! Needs to preserve [X] into CompileSinglePattern
 	
-	;Update reference list to play back changes while phrase is edited
-	sta f:PatternOffsetReferences
-	lda #$ff
-	sta f:PatternOffsetReferences+3
-
 	phb
 	lda #^CompiledPattern
 	pha
@@ -205,23 +306,49 @@ CompilePatternToBuffer:	; !!! Needs to preserve [X] into CompileSinglePattern
 	jsr CompileSinglePattern
 	
 	seta8
-	
+	plb
+rtl
+
+CompileNextRowInSong:
+
+	phb
+	lda #^CompiledPattern
+	pha
+	plb
+	seta16
+
+	lda z:PatternOffsetTablePointer
+	beq :+
+		; 3rd, 5th, 7th row...
+		lda #$ff
+		sta f:PatternOffsetReferences
+		stz z:PatternOffsetTablePointer ; Toggle between 0, and the offset to the alternating table, on alternating rows
+		lda z:PatternIndexOffset
+		sta z:CurrentCompileIndex
+		lda z:FirstRowPatternOffset ; Toggle between first pattern offset, and one the exact size of 8 patterns later, on alternating rows
+		sta z:CurrentPatternOffset
+		jsr CompileSongRowToBuffer
+		bra :++
+	:
+		; 2nd, 4th, 6th row...
+		lda #$ff
+		sta f:PatternOffsetReferencesAlternating
+		lda #.loword(PatternOffsetReferencesAlternating - PatternOffsetReferences)
+		sta z:PatternOffsetTablePointer
+		lda z:PatternIndexOffset
+			clc
+			adc #16
+		sta z:CurrentCompileIndex
+		lda z:SecondRowPatternOffset
+		sta z:CurrentPatternOffset
+		jsr CompileSongRowToBuffer
+	:
+	seta8
 	plb
 rtl
 
 CopyCurrentSongToSpcBuffer:
-; TODO: Buffer song in parts, frame-by-frame ahead of pushing play, to decrease wait time
-; TODO: Move direct page around to optimize performance
-@ChainOffsetOfChannel = $00 ; 16 bytes
-@PhraseOfChannel = $10 ; 16 bytes
-
-@instrumentSize = CurrentPatternOffset ; instrsize variable only used temporarily before we know the pattern offset
-
-; Below are used for a calculation of values that will be static 
-@currentChannelLength = DELETEvariables
-@orderReferenceSize = DELETEvariables+2
-@orderLengthSize = DELETEvariables+4
-
+@instrumentSize = 0
 
 	phb
 	lda #^CompiledPattern
@@ -230,87 +357,25 @@ CopyCurrentSongToSpcBuffer:
 	
 	lda #$ff
 	sta f:PatternOffsetReferences ; $FF indicates the first empty entry, just move the $FF every time an entry is added to prevent looping through the whole thing
-	; TODO: Just leave room for two orders, buffer the first first "order", and buffer one every time one 16-bar order is about to end for continuous play
+	sta f:PatternOffsetReferencesAlternating ; $FF indicates the first empty entry, just move the $FF every time an entry is added to prevent looping through the whole thing
 	seta16
-	stz @orderLengthSize
 
-	; Detect the channel with the longest series of chain rows playing before looping the entire channel
-	ldy #0
-	@channelLoopX:
-		stz @currentChannelLength
-		phy
-
-		tya ; Y counds channel
-		xba ; Channel index is 0x00
-		tax ; X is index in SONG data
-		stx z:SongRowOfChannel
-		@songRowLoopX:
-			lda f:SONG,X
-			and #$ff
-			cmp #$ff
-			beq @endChannel
-			
-			asl
-			asl
-			asl
-			asl
-			asl
-			tax ; index in CHAINS data
-			ldy #16
-			:
-				lda f:CHAINS,X
-				and #$ff
-				cmp #$ff
-				beq @endChain
-				inc @currentChannelLength
-				inx
-				inx
-				dey
-			bne :-
-			@endChain:
-			inc z:SongRowOfChannel
-			lda z:SongRowOfChannel
-			tax
-			and #$ff
-		bne @songRowLoopX
-	
-		@endChannel:
-		lda @currentChannelLength
-		cmp @orderLengthSize
-		bcc :+
-			sta @orderLengthSize
-		:
-		
-		ply
-		iny
-		cpy #8
-	bne @channelLoopX
-	
-	
-	lda @orderLengthSize
-	sta PatternRowCounter
-	asl
-	asl
-	asl
-	asl ; Results in 16, 32, 64, etc
-	sta @orderReferenceSize
-	
 	; TODO: use available instruments
 	lda #8*6
 	sta @instrumentSize
 
 	; Add up all our numbers to find the index where pattern data starts	
-	lda #2+1+2 ; all constant numbers from below added up
+	lda #32+2+2+1+2 ; all constant numbers from below added up
 	clc
-	adc @orderReferenceSize
+	;adc #32 ; 16 order references (two rows of 8 channels)
 	;adc #2 ; $ffff at the end
-	adc @orderLengthSize
+	;adc #2 ; two rows looping forever
 	;adc #1 ; $00 $at the end
 	;adc #2; $ffff for empty macro dir
 	adc @instrumentSize
 	
-	sta CurrentPatternOffset
-	jsr @AddEmptyPattern
+	tay
+	jsr AddEmptyPattern
 
 	; HEADER
 	; TODO: Actually generate 18 byte header based on song settings
@@ -321,107 +386,47 @@ CopyCurrentSongToSpcBuffer:
 		inx
 		cpx #18 ; Header length
 	bne :-
-	stx CurrentCompileIndex
+	stx z:PatternIndexOffset
 
 	; PATTERN REFERENCES
 	ldy #0
 	:
-		jsr @InitiateChannelIndexes
+		jsr InitiateChannelIndexes
 		iny
 		iny
 		cpy #16
 	bne :-
-	
-	lda PatternRowCounter
-	bne :+
-		; Empty song
-		jmp @endSongLoop
-	:
-	@rowLoop:
-	
-		ldy #0 ; Channel index (x2)
-		@channelLoop:
-			ldx z:@ChainOffsetOfChannel,Y
-			bpl :+
-				; Skip entire channel
-				ldx #$ff
-				stx z:@PhraseOfChannel,Y
-				jmp @nextChannel
-			:
-			lda f:CHAINS,X
-			and #$ff
-			cmp #$ff
-			; TODO: !!!!!!!!!!!!!! IMPORTANT !!!!!!!!!!!!! ALSO MOVE TO NEXT SONG ROW AFTER 16 CHAIN ROWS
-			bne :++
-				; Move to next song row
-				ldx z:SongRowOfChannel,Y
-				inx
-				stx z:SongRowOfChannel,Y
-				lda f:SONG,X
-				and #$ff
-				cmp #$ff
-				bne :+
-					; Loop entire channel
-					jsr @InitiateChannelIndexes
-					bra @channelLoop
-				:
-				asl
-				asl
-				asl
-				asl
-				asl
-				tax
-				stx z:@ChainOffsetOfChannel,Y
-				bra @channelLoop
-			:
-			tax
-			stx z:@PhraseOfChannel,Y
-			ldx z:@ChainOffsetOfChannel,Y
-			inx
-			inx
-			stx z:@ChainOffsetOfChannel,Y
-			
-			@nextChannel:
-			iny
-			iny
-			cpy #16
-		bne @channelLoop
-			
-		lda @PhraseOfChannel+0
-		jsr @AddPhraseToIndex
-		lda @PhraseOfChannel+2
-		jsr @AddPhraseToIndex
-		lda @PhraseOfChannel+4
-		jsr @AddPhraseToIndex
-		lda @PhraseOfChannel+6
-		jsr @AddPhraseToIndex
-		lda @PhraseOfChannel+8
-		jsr @AddPhraseToIndex
-		lda @PhraseOfChannel+10
-		jsr @AddPhraseToIndex
-		lda @PhraseOfChannel+12
-		jsr @AddPhraseToIndex
-		lda @PhraseOfChannel+14
-		jsr @AddPhraseToIndex
 
-		dec PatternRowCounter
-		beq @endSongLoop
-	bne @rowLoop
-		
-	@endSongLoop:
+	lda z:PatternIndexOffset
+	sta z:CurrentCompileIndex
+	lda z:FirstRowPatternOffset ; Toggle between first pattern offset, and one the exact size of 8 patterns later, on alternating rows
+	sta z:CurrentPatternOffset
+	clc
+	adc #(4*16+1)*8 ; Next pattern offset should be at least the size of 8 uncompressed patterns later
+	sta z:SecondRowPatternOffset
+	adc #(4*16+1)*8
+	sta z:SecondRowPatternEnd
+	stz z:PatternOffsetTablePointer ; Toggle between 0, and the offset to the alternating table, on alternating rows
+	jsr CompileSongRowToBuffer
 	
-	ldy CurrentCompileIndex
+	
+	ldy z:CurrentCompileIndex
+	lda #0
+	ldx #8 ; Leave room for the next row of pattern indexes
+	:	sta CompiledPattern,Y ; Can be anything other than $FFFF, really
+		iny
+		iny
+		dex
+	bne :-
 	lda #$ffff ; End of pattern refs
 	sta CompiledPattern,Y
 	iny
 	iny
 	lda #16 ; This tracker only makes 16-bar patterns
-	ldx @orderLengthSize
-	:
-		sta CompiledPattern,Y
-		iny
-		dex
-	bne :-
+	sta CompiledPattern,Y
+	iny
+	sta CompiledPattern,Y
+	iny
 	lda #0 ; End of pattern lengths
 	sta CompiledPattern,Y
 	iny
@@ -458,7 +463,7 @@ CopyCurrentSongToSpcBuffer:
 	
 	sty CurrentCompileIndex
 	
-	lda CurrentCompileIndex
+	tya
 	sec
 	sbc #18 ; subtract header
 	cmp EmptyPatternOffset
@@ -467,13 +472,11 @@ CopyCurrentSongToSpcBuffer:
 		brk
 	:
 	
-	
 	seta8
-	
 	plb
 rtl
 
-@InitiateChannelIndexes:
+InitiateChannelIndexes:
 .a16
 	tya
 	xba
@@ -490,7 +493,7 @@ rtl
 		asl
 		asl
 		tax
-		stx z:@ChainOffsetOfChannel,y
+		stx z:ChainOffsetOfChannel,y
 		lda f:CHAINS,X
 		and #$ff
 		cmp #$ff
@@ -498,11 +501,91 @@ rtl
 rts
 	@silence:
 		ldx #$8000 ; Indicates silent channel
-		stx z:@ChainOffsetOfChannel,y
+		stx z:ChainOffsetOfChannel,y
+rts
+
+MoveChannelToNextRowOfSong:
+	ldx z:SongRowOfChannel,Y
+	inx
+	stx z:SongRowOfChannel,Y
+	lda f:SONG,X
+	and #$ff
+	cmp #$ff
+	bne :+
+		; Loop entire channel
+		jmp InitiateChannelIndexes
+	:
+	asl
+	asl
+	asl
+	asl
+	asl
+	tax
+	stx z:ChainOffsetOfChannel,Y
+rts
+
+CompileSongRowToBuffer:
+.a16
+	
+	ldy #0 ; Channel index (x2)
+	@channelLoop:
+		ldx z:ChainOffsetOfChannel,Y
+		bpl :+
+			; Skip entire channel
+			ldx #$ffff
+			stx z:Playback_CurrentChainOffsetOfChannel,Y
+			stx z:PhraseOfChannel,Y
+			bra @nextChannel
+		:
+		lda f:CHAINS,X
+		and #$ff
+		cmp #$ff
+		bne :+
+			jsr MoveChannelToNextRowOfSong
+			bra @channelLoop
+		:
+		tax
+		stx z:PhraseOfChannel,Y
+		ldx z:ChainOffsetOfChannel,Y
+		stx z:Playback_CurrentChainOffsetOfChannel,Y
+		inx
+		inx
+		stx z:ChainOffsetOfChannel,Y
+		txa
+		and #$1F ; just the 00-1F index into the channel
+		bne :+
+			; If 0, read next row from song now
+			jsr MoveChannelToNextRowOfSong
+		:
+		
+		@nextChannel:
+		iny
+		iny
+		cpy #16
+	bne @channelLoop
+		
+	lda z:PhraseOfChannel+0
+	jsr @AddPhraseToIndex
+	lda z:PhraseOfChannel+2
+	jsr @AddPhraseToIndex
+	lda z:PhraseOfChannel+4
+	jsr @AddPhraseToIndex
+	lda z:PhraseOfChannel+6
+	jsr @AddPhraseToIndex
+	lda z:PhraseOfChannel+8
+	jsr @AddPhraseToIndex
+	lda z:PhraseOfChannel+10
+	jsr @AddPhraseToIndex
+	lda z:PhraseOfChannel+12
+	jsr @AddPhraseToIndex
+	lda z:PhraseOfChannel+14
+	jsr @AddPhraseToIndex
+		
 rts
 
 @AddPhraseToIndex:
 .a16
+	and #$ff
 	cmp #$ff
 	bne :+
 		; Load empty pattern reference
@@ -522,7 +605,7 @@ rts
 .a16
 	sta PatternToFind
 	seta8
-	ldx #0
+	ldx z:PatternOffsetTablePointer
 	@patternFindLoop:
 		lda f:PatternOffsetReferences,X
 		cmp #$ff
@@ -554,16 +637,7 @@ rts
 		inx
 	bra @patternFindLoop
 
-@AddEmptyPattern:
-.a16
-	ldy CurrentPatternOffset
-	sty EmptyPatternOffset
-	
-	lda #$80|16 ; 16 silent rows
-	sta CompiledPattern+18,Y ; Remember, when using the pattern offset, add 18 to account for header
-	iny
-	sty CurrentPatternOffset
-rts
+
 @AddPattern: ; [A] = Phrase index
 .a16
 	asl
@@ -625,6 +699,16 @@ rts
 		bne @patternLoop2
 		sty CurrentPatternOffset
 	rts
+	
+AddEmptyPattern:
+.a16
+	sty z:EmptyPatternOffset
+	
+	lda #$80|16 ; 16 silent rows
+	sta CompiledPattern+18,Y ; Remember, when using the pattern offset, add 18 to account for header
+	iny
+	sty z:FirstRowPatternOffset ; Address after empty pattern is where all our song patterns will be added from
+rts
 	
 .macro CopyNotesFromPhraseToCompiledPattern SOURCE
 		lda f:SOURCE+2,X

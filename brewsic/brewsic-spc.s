@@ -598,7 +598,7 @@ ResetPattern:
 
 	mov x, #15
 	mov y, #15
-	@channelLoop:
+	@channelLoop: ; Set pattern address for each channel
 		mov a, [Temp+0]+y
 		mov !ChPatternPointers+x, a
 		dec y
@@ -607,7 +607,7 @@ ResetPattern:
 	
 
 	mov x, #7
-	@channelLoop2:
+	@channelLoop2: ; Init all channels from data that shouldn't carry over between patterns
 		mov a, #0
 		mov !ChPatternPosition+x, a
 		mov ChClearCounter+x, a
@@ -634,9 +634,12 @@ ret
 
 TickModule:
 
+.ifdef SkipLastChannelForSFX
 	mov x, #6
-.ifdef TESTCHANNEL
+.elseif .defined(TESTCHANNEL)
 	mov x, #TESTCHANNEL
+.else
+	mov x, #7
 .endif
 	@updateChannelLoop:
 		call !UpdateDspChannel
@@ -729,6 +732,7 @@ BufferChannelRow:
 	movw CurrentPatternPointer, ya
 	pop x
 
+	; init everything that's related to reading a new note bar
 	mov a, #0
 	mov ChEffect+x, a
 	mov ChEffectParam+x, a

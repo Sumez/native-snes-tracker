@@ -2,7 +2,7 @@
 .include "src/snes.inc"
 .smart
 
-.import Vfx_Update, Vfx_Init
+.import Vfx_Update, Vfx_ResetOnNavigation, Vfx_Init, Playback_Update
 
 
 .segment TilemapBufferSegment
@@ -85,6 +85,10 @@ InitEditor:
 	jsr LoadSong ; TODO: Handle this BEFORE going into the editor
 	
 	; INIT RAM VALUES - Initiate each editor once. Anything that needs to be reset whenever navigating there should be in LoadView
+jsr ResetSprites
+jsr FinalizeSprites
+LoadBlockToOAM OamBuffer, 544
+
 	jsl Cursor_Init
 	jsl Vfx_Init
 	jsl Song_Init
@@ -101,10 +105,6 @@ InitEditor:
 
 	jsr LoadPalettes
 	
-jsr ResetSprites
-jsr FinalizeSprites
-LoadBlockToOAM OamBuffer, 544
-
 	jsl LoadBackgroundUi
 	jsl CopyTilemapToUiLayer
 
@@ -193,8 +193,9 @@ MainLoop:
 		lda NMISTATUS
 	bpl :-	
 
-	jsr UpdateInputStates
+	jsr Playback_Update
 	jsr Vfx_Update
+	jsr UpdateInputStates
 	jsr HandleInput
 
 jmp MainLoop
@@ -202,6 +203,7 @@ jmp MainLoop
 NavigateToScreen:
 
 	sta CurrentScreen
+	jsl Vfx_ResetOnNavigation
 	jsl LoadView
 	wai
 	;jsl CopyEntireTilemap ; TODO: add this if the call to this every NMI gets removed
@@ -212,17 +214,22 @@ jmp MainLoop
 
 
 LoadSong:
-
+@HeaderVerificationCode = $EFCD ; Constant, indicates Initialized SRAM data
+@SaveBreakingBuildVersion = 0 	; Increased every time a public build breaks older save data. If feeling nice, create code to convert from one version to another
 	phb
 	lda #^HEADER
 	pha
 	plb
 
 	ldx HEADER
-	cpx #$ABCD
+	lda HEADER+2
+	cpx #@HeaderVerificationCode
 	bne :+
-		plb
-		rts ; Valid song already present, use sram as-is
+		cmp #@SaveBreakingBuildVersion
+		; TODO: Give user a nice message asking them if they want to reset the data, or give them a change to back it up first
+		bne :+
+			plb
+			rts ; Valid song already present, use sram as-is
 	:
 	
 	lda #$ff
@@ -289,8 +296,10 @@ LoadSong:
 		cpx #$800
 	bne :-
 	
-	ldx #$ABCD
+	ldx #@HeaderVerificationCode
 	stx HEADER
+	lda #@SaveBreakingBuildVersion
+	sta HEADER+2
 
 	plb
 rts
@@ -419,8 +428,6 @@ HandleInput:
 	
 		lda IsPlaying
 		bne :++
-			lda #1
-			sta IsPlaying
 			lda ButtonStates+1
 			bit #>KEY_SELECT
 			beq :+

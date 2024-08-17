@@ -319,5 +319,25 @@ ShowCursor:
 
 jmp UpdateCursorSpriteAndHighlight
 
-
-
+.export Song_UpdateHighlight = UpdateHighlight
+UpdateHighlight:
+	ldy #0
+	ldx #0
+	@loop:
+		lda Playback_CurrentChainOffsetOfChannel+1,y ; Negative value if silent channel
+		bmi :+
+			lda Playback_CurrentSongRowOfChannel,y ; Just the lower byte tells the row
+			clc
+			adc #4 ; TODO: Account for inner Y "scroll" of rows
+			bra :++
+		:
+			lda #$ff
+		:
+		; [X] Has actual channel number
+		jsr HighlightChannel
+		iny
+		iny
+		inx
+		cpx #8
+	bne @loop
+rts

@@ -104,7 +104,7 @@
     <Pipeline>
       <Type>tilemap.custom</Type>
       <Output>gfx/font.inc</Output>
-      <LastProcessed>2024-08-12T12:08:37.7288819+02:00</LastProcessed>
+      <LastProcessed>2024-08-17T13:52:18.3291535+02:00</LastProcessed>
       <Property>
         <Key>script-type</Key>
         <Value>Python</Value>
@@ -144,7 +144,7 @@
       <Output>gfx/cursor.chr</Output>
       <Output>gfx/cursor.pal</Output>
       <Output>gfx/cursor.map</Output>
-      <LastProcessed>2024-08-12T10:43:31.7967629+02:00</LastProcessed>
+      <LastProcessed>2024-08-17T14:00:08.7351777+02:00</LastProcessed>
       <Property>
         <Key>DiscardRedundant</Key>
         <Value>0</Value>
@@ -175,7 +175,7 @@
       </Property>
       <Property>
         <Key>Palette</Key>
-        <Value>0,0,0,0,0;5,130,121,209,255;3,255,255,255,255</Value>
+        <Value>0,0,0,0,0;5,130,121,209,255;3,255,255,255,255;6,223,113,38,255</Value>
       </Property>
     </Pipeline>
   </File>
@@ -228,7 +228,7 @@
       <Output>gfx/ui.chr</Output>
       <Output>gfx/ui.pal</Output>
       <Output>gfx/ui.map</Output>
-      <LastProcessed>2024-08-15T21:30:59.0072421+02:00</LastProcessed>
+      <LastProcessed>2024-08-17T13:57:37.6403074+02:00</LastProcessed>
       <Property>
         <Key>DiscardRedundant</Key>
         <Value>0</Value>
@@ -277,7 +277,7 @@
       <Output>gfx/box.chr</Output>
       <Output>gfx/box.pal</Output>
       <Output>gfx/box.map</Output>
-      <LastProcessed>2024-08-15T23:23:54.4940517+02:00</LastProcessed>
+      <LastProcessed>2024-08-17T13:57:37.6585832+02:00</LastProcessed>
       <Property>
         <Key>DiscardRedundant</Key>
         <Value>1</Value>

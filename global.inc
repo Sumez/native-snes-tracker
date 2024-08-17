@@ -9,17 +9,23 @@
 .global SONG, CHAINS, PHRASES_1, PHRASES_2, INSTRUMENTS
 .globalzp Input_CustomHandler, Input_NavigateIn, Input_NavigateBack, Input_MoveLeft, Input_MoveUp, Input_MoveRight, Input_MoveDown
 .globalzp Input_StartPlayback, OnPlaybackStopped
-.global IsPlaying, CompiledPattern, TilemapBuffer, UiTilemapBuffer, EditMode
+.global CurrentScreen, IsPlaying, CompiledPattern, TilemapBuffer, UiTilemapBuffer, EditMode
 .global Pattern01Offset ; Unsure about these
-.global PlayFullSong
 
 ; Global routines
 .global NavigateToScreen, WriteTilemapHeader, WriteTilemapHeaderId
-.global PlayMosaic
+
+; Playback stuff
+.global PlayFullSong
+.global Playback_CurrentBeatRow, Playback_CurrentPhraseOfChannel
+.globalzp Playback_CurrentChainOffsetOfChannel, Playback_CurrentSongRowOfChannel
 
 ; Cursor stuff
 .global CursorX, CursorY, CursorSize, UpdateCursorSpriteAndHighlight
 
+; Fx stuff
+.global HighlightRow, HighlightChainRow, HighlightChannel
+.global PlayMosaic, Bop
 
 
 .macro Bind pointer, routine

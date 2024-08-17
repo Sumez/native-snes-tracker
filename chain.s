@@ -50,6 +50,7 @@ LoadView:
 	jsl WriteTilemapHeaderId
 	
 	jsl WriteTilemapBuffer
+	jsl UpdateHighlight_long
 	jsl ShowCursor_long
 	
 	;TODO: DELETE
@@ -348,3 +349,31 @@ jmp UpdateCursorSpriteAndHighlight
 
 CopyCurrentSongToSpcBuffer:
 rts
+
+.export Chain_UpdateHighlight = UpdateHighlight
+UpdateHighlight_long: jsr UpdateHighlight
+rtl
+UpdateHighlight:
+	seta16
+	ldy #0
+	:
+		lda Playback_CurrentChainOffsetOfChannel,y
+		and #$FFE0 ; Get start of the current chain
+		cmp CurrentChainIndexInGlobalSong
+		bne :+
+			seta8
+			lda Playback_CurrentChainOffsetOfChannel,y ; Just use the lower byte to find the row in chain
+			and #$1F
+			lsr
+			clc
+			adc #4
+			jmp HighlightChainRow
+			.a16
+		:
+		iny
+		iny
+		cpy #16
+	bne :--
+	seta8
+	lda #$ff
+jmp HighlightChainRow

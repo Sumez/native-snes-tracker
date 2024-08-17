@@ -104,7 +104,7 @@ UpdateCursorSpriteAndHighlight:
 	ldy #%00000000
 	lda EditMode
 	beq :+
-		ldy #(%00110000|2)
+		ldy #(%00110000|2) ; High priority + light palette
 	:
 	tya
 	sta OamBuffer+3
