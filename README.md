@@ -3,7 +3,7 @@
 ### Immediate roadmap:
 
 - Revised CPU controlled playback
-    - ~~ Start playback from any location in song~~ <sup>Done</sup>
+    - ~~Start playback from any location in song~~ <sup>Done</sup>
     - ~~Pointer showing where in the song you are~~ <sup>Done</sup>
     - ~~Edit song, chains, etc. while playing, with immediate feedback~~ <sup>Done</sup>
     - ~~`Sound driver sending data back telling where in the current phrase it is`~~ <sup>Done</sup>
