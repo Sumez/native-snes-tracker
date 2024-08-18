@@ -1,7 +1,7 @@
 .include "global.inc"
 .include "src/snes.inc"
 .smart
-.import StartTestPatternPlayback, PrepareTestPatternPlayback, StopPlayback, SwitchToSingleNoteMode, TransferSingleNoteToSpcAndPlay
+.import PlaySinglePhrase, PrepareTestPatternPlayback, StopPlayback, SwitchToSingleNoteMode, TransferSingleNoteToSpcAndPlay
 .import UpdateNoteInPlayback, NoteDataOffsetInPhrase
 
 .segment "CODE7"
@@ -624,7 +624,7 @@ rts
 StartPlayback:
 	lda CurrentPhraseIndex
 	ldx CurrentPhraseIndexInSongData
-	jsr StartTestPatternPlayback
+	jsr PlaySinglePhrase
 rts
 
 .export Pattern_UpdateBeatHighlight = UpdateBeatHighlight

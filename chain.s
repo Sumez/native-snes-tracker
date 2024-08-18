@@ -1,6 +1,7 @@
 .include "global.inc"
 .include "src/snes.inc"
 .smart
+.import PlaySingleChain
 
 .segment "CODE7"
 Name: .byte "Chain_-_",$ff
@@ -38,7 +39,7 @@ LoadView:
 		jsl LoadGlobalData
 	:
 	
-	Bind Input_StartPlayback, NoAction
+	Bind Input_StartPlayback, StartPlayback
 	Bind Input_CustomHandler, HandleInput
 	Bind Input_NavigateIn, NavigateToPhrase
 	Bind Input_NavigateBack, NavigateToSong
@@ -152,6 +153,19 @@ PreparePlayback:
 	;jsr CopyCurrentSongToSpcBuffer
 	; TODO: If currently playing, don't transfer yet, wait till song stops
 	;jsr TransferEntirePlaybackBufferToSpc
+rts
+
+StartPlayback:
+
+	; Get current index into chain data and store in [X], to tell playback code to start from there
+	seta16
+	lda CursorRow
+	asl
+	ora CurrentChainIndexInGlobalSong
+	tax
+	seta8
+	
+	jsr PlaySingleChain
 rts
 
 PhraseIndexWasChanged:

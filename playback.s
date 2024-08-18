@@ -7,7 +7,8 @@
 .import Song_UpdateHighlight, Chain_UpdateHighlight, Pattern_UpdateBeatHighlight
 
 .export Playback_Update = Update
-.export PrepareTestPatternPlayback, StartTestPatternPlayback, UpdateNoteInPlayback, NoteDataOffsetInPhrase
+.export PrepareTestPatternPlayback, UpdateNoteInPlayback, NoteDataOffsetInPhrase
+.export PlaySinglePhrase, PlaySingleChain
 .export StopPlayback = BrewsicStopTrack
 .export SwitchToSingleNoteMode, TransferSingleNoteToSpcAndPlay
 
@@ -108,6 +109,7 @@ rts
 
 
 PrepareTestPatternPlayback:
+	; Prepare a dummy test pattern so we can initiate a single note playing as quickly as possible
 	lda IsPlaying
 	sta QueuePreparePlayback ; If playing, don't prepare now, but enqueue until current playback ended to avoid conflicting with it
 	bne :+
@@ -127,7 +129,7 @@ CopyTestPatternsToSpcBuffer:
 	bne :-
 rts
 
-StartTestPatternPlayback:
+PlaySinglePhrase:
 	;Update the "current phrase" for playback visual feedback
 	sta PhraseOfChannel
 	;Also update reference list to play back changes while phrase is edited
@@ -149,9 +151,40 @@ StartTestPatternPlayback:
 	sta IsPlaying
 	lda #$ff
 	jsr HighlightRow ; Highlight no rows until a view decides to
-	jsl CompilePatternToBuffer
+	jsl CompilePhraseToBuffer
 	jsr TransferEntirePlaybackBufferToSpcAndPlay
 rts
+
+PlaySingleChain:
+	phx ; Chain offset to play. Need to get this later
+	
+	lda #$ff ; First tell chain view we're not playing any rows in here
+	sta Playback_CurrentChainOffsetOfChannel+1
+	
+	lda #$80 ; $ff indicates playing full song is playing. $80 indicates just looping one chain
+	sta IsPlaying
+	lda #$ff
+	jsr HighlightRow ; Highlight no rows until a view decides to
+
+	; Initialize chains with row requested by caller ([X])
+	seta16
+	pla
+	ora #$8000
+	dec ; Decrease by one, as songrow is always increased by 1 as the first thing in a channel loop
+	sta z:SongRowOfChannel+0 ; Special command in SongRow indicates always playing this ChainOffset
+	stz z:ChainOffsetOfChannel+0 ; Forces "CompileSongRowToBuffer" to load the next song row first
+	lda #$ffff
+	sta z:ChainOffsetOfChannel+2 ; Silences other channels
+	sta z:ChainOffsetOfChannel+4
+	sta z:ChainOffsetOfChannel+6
+	sta z:ChainOffsetOfChannel+8
+	sta z:ChainOffsetOfChannel+10
+	sta z:ChainOffsetOfChannel+12
+	sta z:ChainOffsetOfChannel+14
+	seta8
+
+	jsl CopyCurrentSongToSpcBuffer
+jmp TransferEntirePlaybackBufferToSpcAndPlay
 
 SwitchToSingleNoteMode:
 
@@ -186,9 +219,34 @@ PrepareNextRowInSong:
 jmp TransferPlaybackBufferToSpc
 
 PlayFullSong:
+@rowToStartPlayingFrom = 0 ; 2 bytes
+	sta z:@rowToStartPlayingFrom
+	stz z:@rowToStartPlayingFrom+1
+	
 	lda #$ff ; $ff indicates playing full song is playing. $80 indicates just looping one chain
 	sta IsPlaying
 	jsr HighlightRow ; Highlight no rows until a view decides to
+
+	; Initialize chains with row 0 of each channel in song
+	seta16
+	ldy #0
+	:
+		tya
+		xba
+		lsr
+		ora z:@rowToStartPlayingFrom
+
+		tax
+		dex ; channel progress always starts at the "end" of a chain, so decrease X once, so when the next song row is loaded, it will be the first
+		stx z:SongRowOfChannel,Y
+		ldx #0 ; Forces "CompileSongRowToBuffer" to load the next song row first
+		stx z:ChainOffsetOfChannel,Y
+
+		iny
+		iny
+		cpy #16
+	bne :-
+	seta8
 
 	jsl CopyCurrentSongToSpcBuffer
 jmp TransferEntirePlaybackBufferToSpcAndPlay
@@ -288,7 +346,7 @@ UpdateNoteInPlayback: ; !!! Needs to preserve [X] into CompileSingleNoteBar
 
 .segment "CODE6"
 
-CompilePatternToBuffer:	; !!! Needs to preserve [X] into CompileSinglePattern
+CompilePhraseToBuffer:	; !!! Needs to preserve [X] into CompileSinglePattern
 	
 	phb
 	lda #^CompiledPattern
@@ -303,7 +361,7 @@ CompilePatternToBuffer:	; !!! Needs to preserve [X] into CompileSinglePattern
 	
 	; Load phrase into test pattern
 	tay
-	jsr CompileSinglePattern
+	jsr CompileSinglePhrase
 	
 	seta8
 	plb
@@ -389,18 +447,6 @@ CopyCurrentSongToSpcBuffer:
 	stx z:PatternIndexOffset
 
 	; PATTERN REFERENCES
-	ldy #0
-	:
-		jsr InitiateChannelIndexes
-		ldx z:SongRowOfChannel,Y
-		dex ; channel progress always starts at the "end" of a chain, so decrease X once, so when the next song row is loaded, it will be the first
-		stx z:SongRowOfChannel,Y
-
-		iny
-		iny
-		cpy #16
-	bne :-
-
 	lda z:PatternIndexOffset
 	sta z:CurrentCompileIndex
 	lda z:FirstRowPatternOffset ; Toggle between first pattern offset, and one the exact size of 8 patterns later, on alternating rows
@@ -416,7 +462,7 @@ CopyCurrentSongToSpcBuffer:
 	
 	ldy z:CurrentCompileIndex
 	lda #0
-	ldx #8 ; Leave room for the next row of pattern indexes
+	ldx #8 ; Leave room for the next song-row of pattern indexes
 	:	sta CompiledPattern,Y ; Can be anything other than $FFFF, really
 		iny
 		iny
@@ -511,52 +557,84 @@ rts
 MoveChannelToNextRowOfSong:
 	ldx z:SongRowOfChannel,Y
 	inx
-	stx z:SongRowOfChannel,Y
-	lda f:SONG,X
-	and #$ff
-	cmp #$ff
-	bne :+
-		; Loop entire channel
-		jmp InitiateChannelIndexes
-	:
-	asl
-	asl
-	asl
-	asl
-	asl
-	tax
-	stx z:ChainOffsetOfChannel,Y
-rts
+	bpl @storeChainIndex ; Max valid song row is $800, so a negative value indicated by the highest bit means loop from a fixed chain index instead the loaded song
+		
+		@customChainOffset:
+		txa
+		pha
+		and #$FFE0 ; Discard index into current chain, so we loop from the start of the chain next time
+		tax
+		dex
+		stx z:SongRowOfChannel,Y
+		
+		pla
+		and #$7FFF ; realistically just a number from 0-$1FFE
+		tax
+		stx z:ChainOffsetOfChannel,Y
+		lda f:CHAINS,X
+		and #$ff
+		cmp #$ff
+		beq @silence
+	rts
+		@silence:
+			ldx #$8000 ; Indicates silent channel
+			stx z:ChainOffsetOfChannel,y
+	rts
+
+	@storeChainIndex:
+		stx z:SongRowOfChannel,Y
+		lda f:SONG,X
+		and #$ff
+		cmp #$ff
+		bne :+
+			; Loop entire channel
+			jmp InitiateChannelIndexes
+		:
+		asl
+		asl
+		asl
+		asl
+		asl
+		tax
+		stx z:ChainOffsetOfChannel,Y
+	rts
 
 CompileSongRowToBuffer:
 .a16
 	
 	ldy #0 ; Channel index (x2)
 	@channelLoop:
+		; First check if we need to load the next chain
+		ldx z:ChainOffsetOfChannel,Y
+		bmi @skipChannel ; Already figured out previously that channel is skipped (if it starts on a blank chain, or blank phrase in first chain)
+
+		txa
+@rowsInAChain = 16
+		and #(@rowsInAChain-1)<<1 ; just the 00-1F index into the channel
+		bne :+
+			; On first row, or looped through an entire chain - Load next chain in queue for this channel
+			jsr MoveChannelToNextRowOfSong
+		
+		@readChainRow:
+		; Then get actual phrase to load
 		ldx z:ChainOffsetOfChannel,Y
 		bpl :+
 			; Skip entire channel
+			@skipChannel:
 			ldx #$ffff
 			stx z:Playback_CurrentChainOffsetOfChannel,Y
 			stx z:PhraseOfChannel,Y
 			bra @nextChannel
 		:
 		
-		; Check if we reached end of chain
-		txa
-		and #$6 ; just the 00-1F index into the channel
-		bne :+
-			; Load next chain for channel
-			jsr MoveChannelToNextRowOfSong
-		:
-
-		ldx z:ChainOffsetOfChannel,Y
+		; Not skipping channel, load next entry in chain
 		lda f:CHAINS,X
 		and #$ff
 		cmp #$ff
 		bne :+
+			; $FF means early end of chain, move to next row in song and restart channel loop
 			jsr MoveChannelToNextRowOfSong
-			bra @channelLoop
+			bra @readChainRow
 		:
 		tax
 		stx z:PhraseOfChannel,Y
@@ -659,7 +737,7 @@ rts
 	ldy CurrentPatternOffset
 	
 	
-	CompileSinglePattern:
+	CompileSinglePhrase:
 	lda #15 ; block header byte (15 = 16 uncompressed bars)
 	sta CompiledPattern+18,Y ; Remember, when using the pattern offset, add 18 to account for header
 	iny

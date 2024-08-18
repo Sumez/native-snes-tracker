@@ -431,6 +431,7 @@ HandleInput:
 			lda ButtonStates+1
 			bit #>KEY_SELECT
 			beq :+
+				lda #0
 				jmp PlayFullSong
 			:			
 			jmp (Input_StartPlayback)

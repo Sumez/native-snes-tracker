@@ -31,7 +31,7 @@ rtl
 .export Song_LoadView = LoadView
 LoadView:
 
-	Bind Input_StartPlayback, PlayFullSong
+	Bind Input_StartPlayback, PlaySongFromSelectedRow
 	Bind Input_CustomHandler, HandleInput
 	Bind Input_NavigateIn, NavigateToChain
 	Bind Input_NavigateBack, NoAction
@@ -112,6 +112,10 @@ PreparePlayback:
 	; TODO: If currently playing, don't transfer yet, wait till song stops
 	;jsr TransferEntirePlaybackBufferToSpc
 rts
+
+PlaySongFromSelectedRow:
+	lda CursorPosition ; Low byte tells which row we are one
+jmp PlayFullSong
 
 ChainIndexWasChanged:
 	jsl WriteTilemapBuffer
@@ -326,10 +330,13 @@ UpdateHighlight:
 	@loop:
 		lda Playback_CurrentChainOffsetOfChannel+1,y ; Negative value if silent channel
 		bmi :+
-			lda Playback_CurrentSongRowOfChannel,y ; Just the lower byte tells the row
-			clc
-			adc #4 ; TODO: Account for inner Y "scroll" of rows
-			bra :++
+			lda Playback_CurrentSongRowOfChannel+1,y
+			inc
+			bmi :+ ; If high byte is negative after one addition, this means only one chain keeps looping, don't show anything in this view
+				lda Playback_CurrentSongRowOfChannel,y ; Just the lower byte tells the row
+				clc
+				adc #4 ; TODO: Account for inner Y "scroll" of rows
+				bra :++
 		:
 			lda #$ff
 		:
