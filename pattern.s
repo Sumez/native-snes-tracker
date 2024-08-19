@@ -36,7 +36,6 @@ Init:
 	stx CursorPositionRow
 	ldx #0
 	stx CursorPositionCol
-	stz IsPlaying
 	
 	lda #(12*4)
 	sta LastEditedNote
@@ -113,10 +112,17 @@ LoadGlobalData:
 		sta PatternInstruments,x
 		iny		
 		lda [@sourcePointer],y
-		sta PatternCommands,x
-		iny
-		lda [@sourcePointer],y
-		sta PatternCommandParams,x
+		cmp #$ff
+		beq :+
+			sta PatternCommands,x
+			iny
+			lda [@sourcePointer],y
+			sta PatternCommandParams,x
+			bra :++
+		:
+			stz PatternCommands,x
+			stz PatternCommandParams,x
+		:
 		iny
 		lda [@sourcePointer],y
 		sta PatternNotes,x
@@ -260,41 +266,44 @@ ldy #0
 	lda PatternNotes,Y
 	cmp #$ff
 	beq @noNote
-	ldy #0
-	sec
-	:
-		sbc #12
-		bcc :+
-			iny
-			bra :-
-	:
-	adc #12 ; Carry always clear at this point due to the branch that took us here
-	pha
-	; now A=Note and Y=Octave
-	lda Octaves,Y
-	sta f:PatternBuffer+12,x
-	pla
-	tay
-	lda Notes,Y
-	sta f:PatternBuffer+8,x
-	lda NotesSharp,Y
-	sta f:PatternBuffer+10,x
 	
-	ldy @currentNote
-	lda PatternInstruments,Y
-	pha
-	and #$F0
-	lsr
-	lsr
-	lsr
-	lsr
-	ora #$40
-	sta f:PatternBuffer+16,x
-	pla
-	and #$0F
-	ora #$40
-	sta f:PatternBuffer+18,x
-	
+		; First get octave tile
+		ldy #0
+		sec
+		:
+			sbc #12
+			bcc :+
+				iny
+				bra :-
+		:
+		adc #12 ; Carry always clear at this point due to the branch that took us here
+		pha
+		; now A=Note and Y=Octave
+		lda Octaves,Y
+		sta f:PatternBuffer+12,x
+		pla
+		tay
+		lda Notes,Y
+		sta f:PatternBuffer+8,x
+		lda NotesSharp,Y
+		sta f:PatternBuffer+10,x
+		
+		ldy @currentNote
+		lda PatternInstruments,Y
+		; TODO: Numberizer macro or routine
+		pha
+		and #$F0
+		lsr
+		lsr
+		lsr
+		lsr
+		ora #$40
+		sta f:PatternBuffer+16,x
+		pla
+		and #$0F
+		ora #$40
+		sta f:PatternBuffer+18,x
+		
 	bra :+
 	@noNote:
 	
@@ -311,17 +320,41 @@ ldy #0
 		sta f:PatternBuffer+16,x
 		lda #$1f
 		sta f:PatternBuffer+18,x
+
 	:
 	
+	lda PatternCommands,Y
+	beq @emptyCommand
+		and #$0F
+		ora #$40
+		sta f:PatternBuffer+22,x
 	
-	;COMMANDS
+		lda PatternCommandParams,Y
+		pha
+		and #$F0
+		lsr
+		lsr
+		lsr
+		lsr
+		ora #$40
+		sta f:PatternBuffer+24,x
+		pla
+		and #$0F
+		ora #$40
+		sta f:PatternBuffer+26,x
+		bra :+
+
+	@emptyCommand:
+		;Command
 		lda #$1d
 		sta f:PatternBuffer+22,x
 		lda #$1e
 		sta f:PatternBuffer+24,x
 		lda #$1f
 		sta f:PatternBuffer+26,x
-		
+
+	:
+
 	seta16
 	txa
 	clc
@@ -385,7 +418,7 @@ rts
 NoAction: rts
 ReturnToChainView:
 	lda #1
-	ldy #$ff ; Reuse already loaded pattern
+	ldy #$ff ; Reuse already loaded chain
 jmp NavigateToScreen
 
 HandleInput:
@@ -427,20 +460,27 @@ HandleInput:
 
 			lda #1
 			sta EditMode
+
+			lda CursorPositionCol
+			cmp #2
+			bcs @showCursor ; If command or command param column, don't insert or play notes
 			
 			; Check if note exists, and if not, place the last one edited
 			ldx CursorPositionRow
 			lda PatternNotes,x
 			cmp #$ff
-			bne :+
+			bne @playNote
+			
 				; No note exists. Use last edited
 				lda LastEditedNote
 				sta PatternNotes,x
 				lda LastEditedInstrument
 				sta PatternInstruments,x
 				jsr NoteWasChanged
-			:
+					
+			@playNote:
 			jsr PlayCurrentNote
+			@showCursor:
 			jsr ShowCursor
 
 	@continue:
@@ -448,7 +488,9 @@ HandleInput:
 	; If in edit mode, branch to input relevant to that. if not, branch to internal navigation
 	; If L button held, branch to global navigation (handle in editor.s?)
 	lda EditMode
-	beq @Navigation
+	bne :+
+		jmp @Navigation
+	:
 
 @EditMode:
 
@@ -456,6 +498,7 @@ HandleInput:
 	ldx CursorPositionCol
 	bne @EditModeInstrumentCol
 
+; TODO: Make this a lot simpler. Maybe use an indirect jump depending on which column is active?
 @EditModeNodeCol:
 	bit #>KEY_DOWN
 	beq :+
@@ -480,6 +523,9 @@ HandleInput:
 rts
 
 @EditModeInstrumentCol:
+	cpx #1
+	bne @EditModeCommandIdCol
+	
 	bit #>KEY_DOWN
 	beq :+
 		lda #(256-$10)
@@ -499,6 +545,55 @@ rts
 	beq :+
 		lda #1
 		jmp ChangeCurrentInstrument
+	:
+rts
+
+@EditModeCommandIdCol:
+	cpx #2
+	bne @EditModeCommandParamCol
+	
+	bit #>KEY_DOWN
+	beq :+
+		lda #(256-1)
+		jmp ChangeCurrentCommand
+	:
+	bit #>KEY_UP
+	beq :+
+		lda #1
+		jmp ChangeCurrentCommand
+	:
+	bit #>KEY_LEFT
+	beq :+
+		lda #(256-1)
+		jmp ChangeCurrentCommand
+	:
+	bit #>KEY_RIGHT
+	beq :+
+		lda #1
+		jmp ChangeCurrentCommand
+	:
+rts
+
+@EditModeCommandParamCol:
+	bit #>KEY_DOWN
+	beq :+
+		lda #(256-$10)
+		jmp ChangeCurrentCommandParam
+	:
+	bit #>KEY_UP
+	beq :+
+		lda #$10
+		jmp ChangeCurrentCommandParam
+	:
+	bit #>KEY_LEFT
+	beq :+
+		lda #(256-1)
+		jmp ChangeCurrentCommandParam
+	:
+	bit #>KEY_RIGHT
+	beq :+
+		lda #1
+		jmp ChangeCurrentCommandParam
 	:
 rts
 
@@ -555,6 +650,29 @@ ChangeCurrentInstrument:
 	jsr NoteWasChanged
 jmp PlayCurrentNote
 
+ChangeCurrentCommand:
+	ldx CursorPositionRow
+	clc
+	adc PatternCommands,x
+	bpl :+
+		lda #0
+		bra :++
+	:
+	cmp #11 ; TODO: Number of supported commands
+	bcc :+
+		lda #11
+		dec
+	:
+	sta PatternCommands,x
+jmp NoteWasChanged
+
+ChangeCurrentCommandParam:
+	ldx CursorPositionRow
+	clc
+	adc PatternCommandParams,x
+	sta PatternCommandParams,x
+jmp NoteWasChanged
+
 MoveCursorDown:
 	lda CursorPositionRow
 	inc
@@ -576,12 +694,19 @@ MoveCursorUp:
 jmp ShowCursor
 
 SetNoteCol:
-	stz CursorPositionCol
+	dec CursorPositionCol
+	bpl :+
+		stz CursorPositionCol
+	:
 jmp ShowCursor
 
 SetInstrumentCol:
-	lda #1
-	sta CursorPositionCol
+	inc CursorPositionCol
+	lda CursorPositionCol
+	cmp #$4
+	bne :+
+		dec CursorPositionCol
+	:
 jmp ShowCursor
 
 ShowCursor_long: jsr ShowCursor
@@ -593,14 +718,27 @@ ShowCursor:
 	adc #4
 	sta CursorY
 	lda CursorPositionCol
-	bne :+
+	bne @notnote
 		lda #4
 		sta CursorX
 		lda #1
 		bra :++
-	:
+	@notnote:
+		cmp #1
+		bne @notins
 		lda #8
 		sta CursorX
+		bra :+
+	@notins:
+		cmp #2
+		bne @notcmdId
+		lda #11
+		sta CursorX
+		bra :+
+	@notcmdId:
+		lda #12
+		sta CursorX
+		:
 		lda #0
 	:
 	sta CursorSize

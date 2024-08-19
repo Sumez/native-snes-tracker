@@ -1,6 +1,5 @@
 .include "global.inc"
 .include "src/snes.inc"
-.smart
 
 .segment "BSS"
 BopTimer: .res 1

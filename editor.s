@@ -2,7 +2,7 @@
 .include "src/snes.inc"
 .smart
 
-.import Vfx_Update, Vfx_ResetOnNavigation, Vfx_Init, Playback_Update
+.import Vfx_Update, Vfx_ResetOnNavigation, Vfx_Init, Playback_Update, StopPlayback
 
 
 .segment TilemapBufferSegment
@@ -21,6 +21,7 @@ UiTilemapBuffer:
 	TITLE: .res $40
 	AUTHOR: .res $40
 	SONG: .res $800 ; $0-FF, 8 channels per row
+	SAMPLES: .res 16*64 ; 64 entries, with an index and 14-char name-check each
 	.segment "SRAM2"
 	CHAINS: .res $2000 ; 2 bytes (phrase ref and transpose), 16 rows, $80 different chains of $20 each
 	.segment "SRAM3"
@@ -63,6 +64,7 @@ OnPlaybackStopped: .res 2
 
 .segment "BSS"
 CurrentScreen: .res 1
+PreviousScreen: .res 1
 ResetStack: .res 2
 
 .segment CompiledPlaybackDataSegment
@@ -80,7 +82,7 @@ InitMidScreen:
 InitEditor:
 .export InitEditor
 .import LoadTextGraphics, LoadPalettes
-.import Cursor_Init, Pattern_Init, Chain_Init, Song_Init;, Chain_Init, Pattern_Init
+.import Cursor_Init, Pattern_Init, Chain_Init, Song_Init, Samples_Init
 
 	jsr LoadSong ; TODO: Handle this BEFORE going into the editor
 	
@@ -89,6 +91,7 @@ jsr ResetSprites
 jsr FinalizeSprites
 LoadBlockToOAM OamBuffer, 544
 
+	jsl Samples_Init
 	jsl Cursor_Init
 	jsl Vfx_Init
 	jsl Song_Init
@@ -201,21 +204,31 @@ MainLoop:
 jmp MainLoop
 
 NavigateToScreen:
-
+	cmp CurrentScreen
+	beq @return
+	
+	pha
+	lda CurrentScreen
+	sta PreviousScreen
+	pla
 	sta CurrentScreen
 	jsl Vfx_ResetOnNavigation
 	jsl LoadView
 	wai
 	;jsl CopyEntireTilemap ; TODO: add this if the call to this every NMI gets removed
-	
+@return:
 	ldx ResetStack
 	txs
 jmp MainLoop
 
+NavigateToPreviousScreen:
+	lda PreviousScreen
+	ldy #$ff ; Reuse what was already loaded if relevant
+jmp NavigateToScreen
 
 LoadSong:
 @HeaderVerificationCode = $EFCD ; Constant, indicates Initialized SRAM data
-@SaveBreakingBuildVersion = 0 	; Increased every time a public build breaks older save data. If feeling nice, create code to convert from one version to another
+@SaveBreakingBuildVersion = 1;TODO! 	; Increased every time a public build breaks older save data. If feeling nice, create code to convert from one version to another
 	phb
 	lda #^HEADER
 	pha
@@ -224,58 +237,55 @@ LoadSong:
 	ldx HEADER
 	lda HEADER+2
 	cpx #@HeaderVerificationCode
-	bne :+
+	bne @resetData
 		cmp #@SaveBreakingBuildVersion
 		; TODO: Give user a nice message asking them if they want to reset the data, or give them a change to back it up first
 		bne :+
 			plb
 			rts ; Valid song already present, use sram as-is
-	:
-	
+		:
+		cmp #0
+		bne @resetData
+			jmp @resetSamples ; 0->1 = Add default "addedsamples"
+	@resetData:	
 	lda #$ff
 	ldx #0
-	:
-		sta f:SONG,X
+	:	sta f:SONG,X
 		inx
 		cpx #$800
 	bne :-
 
 	lda #$ff
 	ldx #0
-	:
-		sta f:CHAINS,X
+	:	sta f:CHAINS,X
 		inx
 		cpx #$2000
 	bne :-
 
 	lda #$ff
 	ldx #0
-	:
-		sta f:PHRASES_1,X
+	:	sta f:PHRASES_1,X
 		inx
 		cpx #$2000
 	bne :-
 
 	lda #$ff
 	ldx #0
-	:
-		sta f:PHRASES_2,X
+	:	sta f:PHRASES_2,X
 		inx
 		cpx #$2000
 	bne :-
 
 	lda #$ff
 	ldx #0
-	:
-		sta f:PHRASES_3,X
+	:	sta f:PHRASES_3,X
 		inx
 		cpx #$2000
 	bne :-
 
 	lda #$ff
 	ldx #0
-	:
-		sta f:PHRASES_4,X
+	:	sta f:PHRASES_4,X
 		inx
 		cpx #$2000
 	bne :-
@@ -290,11 +300,26 @@ LoadSong:
 	
 	lda #$00
 	ldx #0
-	:
-		sta f:META,X
+	:	sta f:META,X
 		inx
 		cpx #$800
 	bne :-
+	
+	@resetSamples: .import DefaultSamples, DefaultSamplesEnd
+	ldx #0
+	:
+		lda f:DefaultSamples,X
+		sta f:SAMPLES,X
+		inx
+		cpx #(DefaultSamplesEnd-DefaultSamples)
+	bne :-
+	lda #$ff
+	:
+		sta f:SAMPLES,X
+		inx
+		cpx #(16*64)
+	bne :-
+	
 	
 	ldx #@HeaderVerificationCode
 	stx HEADER
@@ -416,8 +441,9 @@ LoadView:
 	jsr ClearTilemap
 	jumpTable ViewLoaders
 rtl
-ViewLoaders: .import Song_LoadView, Chain_LoadView, Pattern_LoadView
-.addr Song_LoadView, Chain_LoadView, Pattern_LoadView
+ViewLoaders: .import Song_LoadView, Chain_LoadView, Pattern_LoadView, Samples_LoadView
+.addr Song_LoadView, Chain_LoadView, Pattern_LoadView, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+.addr 0, Samples_LoadView
 
 .segment "CODE7"
 HandleInput:
@@ -438,13 +464,17 @@ HandleInput:
 			;RETURNS - no more inputs read this frame
 		rts
 		:
-			stz IsPlaying
-			.import BrewsicStopTrack
-			jsr BrewsicStopTrack
-			jmp (OnPlaybackStopped)
+			jmp StopPlayback
 			;RETURNS - no more inputs read this frame
 	
 	@didNotPushStart:
+
+	lda ButtonPushed
+	and #KEY_L|KEY_R
+	beq :+
+		lda #$11
+		jmp NavigateToScreen
+	:
 
 	lda ButtonStates+1
 	and #>KEY_SELECT

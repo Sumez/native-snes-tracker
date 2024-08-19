@@ -16,6 +16,7 @@
       <Symbol>FASTTRANSFER</Symbol>
       <Symbol>HIROM</Symbol>
       <CalculateChecksum>true</CalculateChecksum>
+      <HiRom>true</HiRom>
       <Custom>false</Custom>
     </Settings>
   </BuildConfiguration>
@@ -29,6 +30,7 @@
       <MapFile>bin/lorom.map.txt</MapFile>
       <Symbol>FASTTRANSFER</Symbol>
       <CalculateChecksum>true</CalculateChecksum>
+      <HiRom>false</HiRom>
       <Custom>false</Custom>
     </Settings>
   </BuildConfiguration>
@@ -316,5 +318,15 @@
     <Id>30</Id>
     <RelativePath>README.md</RelativePath>
     <Mode>Ignore</Mode>
+  </File>
+  <File>
+    <Id>31</Id>
+    <RelativePath>data/samples.s</RelativePath>
+    <Mode>IncludeInAssembly</Mode>
+  </File>
+  <File>
+    <Id>32</Id>
+    <RelativePath>samples.s</RelativePath>
+    <Mode>IncludeInAssembly</Mode>
   </File>
 </BrewmasterProject>

@@ -61,13 +61,6 @@ Init:
 
 	jsr RunSpcCode
 
-	ldx #(SampleDirectoryAddress-1)
-	stx z:TransferDestination
-	lda #^Image1
-	ldx #.loword(Image1)
-	ldy #.loword(Image1End-Image1) ; Size
-	jsr TransferBlock
-
 rts
 
 
@@ -546,12 +539,6 @@ sb_start:
 ;----------------------------------------------------------------------
 	rts			; return
 ;----------------------------------------------------------------------
-
-
-.segment "RODATA5"
-Image1:
-.incbin "music/lucky.bin"
-Image1End:
 
 .segment "ROM12"
 StreamSrc:

@@ -1,24 +1,24 @@
 .global PatternNotes,PatternInstruments
-.define GAME_TITLE "SuperTrax"
+.define GAME_TITLE "SuperTrax94"
 
 .define TilemapBufferSegment "BSS7F"
 .define CompiledPlaybackDataSegment "BSS7E"
-.define SongDataSegment "SRAM"
 
 ; Memory addresses
-.global SONG, CHAINS, PHRASES_1, PHRASES_2, INSTRUMENTS
+.global SONG, CHAINS, PHRASES_1, PHRASES_2, INSTRUMENTS, SAMPLES
 .globalzp Input_CustomHandler, Input_NavigateIn, Input_NavigateBack, Input_MoveLeft, Input_MoveUp, Input_MoveRight, Input_MoveDown
 .globalzp Input_StartPlayback, OnPlaybackStopped
 .global CurrentScreen, IsPlaying, CompiledPattern, TilemapBuffer, UiTilemapBuffer, EditMode
 .global Pattern01Offset ; Unsure about these
 
 ; Global routines
-.global NavigateToScreen, WriteTilemapHeader, WriteTilemapHeaderId
+.global NavigateToScreen, NavigateToPreviousScreen, WriteTilemapHeader, WriteTilemapHeaderId
 
 ; Playback stuff
 .global PlayFullSong
 .global Playback_CurrentBeatRow, Playback_CurrentPhraseOfChannel
 .globalzp Playback_CurrentChainOffsetOfChannel, Playback_CurrentSongRowOfChannel
+.global TrackDataAddressInSpc
 
 ; Cursor stuff
 .global CursorX, CursorY, CursorSize, UpdateCursorSpriteAndHighlight
@@ -195,20 +195,76 @@ Bg4ChrBase = $0000
 
 
 
+.charmap 'A',$00
+.charmap 'B',$01
 .charmap 'C',$02
+.charmap 'D',$03
+.charmap 'E',$04
+.charmap 'F',$05
+.charmap 'G',$06
+.charmap 'H',$07
+.charmap 'I',$08
+.charmap 'J',$09
+.charmap 'K',$0a
+.charmap 'L',$0b
+.charmap 'M',$0c
+.charmap 'N',$0d
+.charmap 'O',$0e
 .charmap 'P',$0f
+.charmap 'Q',$10
+.charmap 'R',$11
 .charmap 'S',$12
+.charmap 'T',$13
+.charmap 'U',$14
+.charmap 'V',$15
+.charmap 'W',$16
+.charmap 'X',$17
+.charmap 'Y',$18
+.charmap 'Z',$19
+.charmap '!',$1a
+.charmap '?',$1b
+.charmap '#',$1c
+
 .charmap 'a',$20
+.charmap 'b',$21
+.charmap 'c',$22
+.charmap 'd',$23
 .charmap 'e',$24
+.charmap 'f',$25
 .charmap 'g',$26
 .charmap 'h',$27
 .charmap 'i',$28
+.charmap 'j',$29
+.charmap 'k',$2a
+.charmap 'l',$2b
+.charmap 'm',$2c
 .charmap 'n',$2d
 .charmap 'o',$2e
+.charmap 'p',$2f
+.charmap 'q',$30
 .charmap 'r',$31
 .charmap 's',$32
+.charmap 't',$33
+.charmap 'u',$34
+.charmap 'v',$35
+.charmap 'w',$36
+.charmap 'x',$37
+.charmap 'y',$38
+.charmap 'z',$39
+.charmap '.',$3a
 .charmap '-',$3b
-.charmap '_',$3f
+.charmap '_',$3f ; Space
+
+.charmap '0',$40
+.charmap '1',$41
+.charmap '2',$42
+.charmap '3',$43
+.charmap '4',$44
+.charmap '5',$45
+.charmap '6',$46
+.charmap '7',$47
+.charmap '8',$48
+.charmap '9',$49
 
 .smart
 

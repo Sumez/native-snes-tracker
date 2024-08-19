@@ -76,7 +76,9 @@ stx seed
 ldx #$06A2
 stx seed+2
 
-.import InitEditor
+.import InitEditor, LoadSamples
+
+jsl LoadSamples
 jmp InitEditor
 
 

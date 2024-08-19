@@ -9,13 +9,14 @@
 .export Playback_Update = Update
 .export PrepareTestPatternPlayback, UpdateNoteInPlayback, NoteDataOffsetInPhrase
 .export PlaySinglePhrase, PlaySingleChain
-.export StopPlayback = BrewsicStopTrack
+.export StopPlayback
 .export SwitchToSingleNoteMode, TransferSingleNoteToSpcAndPlay
 
 
 .segment "BSS"
 IsPlaying: .res 1
 QueuePreparePlayback: .res 1
+TrackDataAddressInSpc: .res 2
 
 ; TODO: Max of 16 possible phrases at a time when continuous pattern transfer is implemented
 ; Maybe two lists, so it's quicker to erase the old one when buffering new phrase patterns
@@ -44,10 +45,6 @@ ChainOffsetOfChannel: .res $10 ; row that will be read when NEXT phrase starts
 PhraseOfChannel: .res $10
 Playback_CurrentChainOffsetOfChannel: .res $10 ; Caches the last actually read row
 PatternOffsetTablePointer: .res 2
-
-
-DELETEvariables: .res 6
-
 
 .segment "CODE7"
 
@@ -218,6 +215,15 @@ PrepareNextRowInSong:
 	ldy SecondRowPatternEnd ; TODO: Instead of transfering everything, break it into small bits to prevent halting the song for a full 1+ frame
 jmp TransferPlaybackBufferToSpc
 
+StopPlayback:
+	jsr BrewsicStopTrack
+	lda IsPlaying
+	beq :+
+		stz IsPlaying
+		jmp (OnPlaybackStopped)
+	:
+rts
+			
 PlayFullSong:
 @rowToStartPlayingFrom = 0 ; 2 bytes
 	sta z:@rowToStartPlayingFrom
@@ -280,13 +286,11 @@ jmp spcTransfer
 ; X = Offset to transfer from
 ; Y = Bytes to transfer
 spcTransfer:
-.import SampleDirectoryAddress
-@patternDataStartInSpcMemory = SampleDirectoryAddress + $5098 ; Needs to be dynamic, determined after transfer of samples
 	
 	seta16
 	txa
 	clc
-	adc #@patternDataStartInSpcMemory
+	adc TrackDataAddressInSpc
 	sta z:BrewsicTransferDestination ; Destination in SPC memory
 
 	txa
@@ -493,8 +497,7 @@ CopyCurrentSongToSpcBuffer:
 ;$A0 ; volume
 ;$0000 ; volume envelope address
 ;0 ; unused
-		lda f:DELETEtestinstruments,X
-		and #$00FF
+		txa
 		ora #$F700
 		sta CompiledPattern+0,Y
 		lda #$00FF
@@ -797,18 +800,22 @@ AddEmptyPattern:
 rts
 	
 .macro CopyNotesFromPhraseToCompiledPattern SOURCE
+;+0 = instrument id, ;+1 = command id, ;+2 = command param, ;+3 = note
 		lda f:SOURCE+2,X
 		sta CompiledPattern+18+2,Y
 		and #$ff00 ; Check if note value is $ff
 		cmp #$ff00
 		bne :+
-			lda #$0080
+;			lda #$0080
+			lda f:SOURCE+0,X
+			and #$ff00
+			ora #$0080 ; Always command data (even when 0), ensures constant pattern size
 			sta CompiledPattern+18,Y ; Then store $80 in instrument byte
 			bra :++
 		:
 			lda f:SOURCE+0,X
 			ora #$0080 ; Always command data (even when 0), ensures constant pattern size
-			and #$00ff ; Unset command (TODO: If high byte is $FF)
+;			and #$00ff ; Unset command (TODO: If high byte is $FF)
 			sta CompiledPattern+18,Y
 		:
 .endmacro
@@ -850,9 +857,7 @@ rtl
 
 .a8
 
-
-DELETEtestinstruments:
-.byte 1,2,3,5,6,0 ; Preprogrammed instrument sample references. Delete when instrument editing becomes a thing
+; !!!!!!!!!!!!!!!!!!!!!! TODO: Only use tiny bits of this, if any, dynamically add instruments using same code as full song and chain
 TestPatternSource:
 ; Preprogrammed pattern used to test single phrase or play a single note
 
@@ -879,6 +884,13 @@ test_pattern_trackindex_start:
 .addr $FFFF ; END
 
 ;INSTRUMENTS
+.byte $00 ; sample
+.word $FFF7 ; pitch adjust
+.byte $00 ; fadeout
+.byte $A0 ; volume
+.addr $0000 ; volume envelope address
+.byte 0 ; unused
+
 .byte $01 ; sample
 .word $FFF7 ; pitch adjust
 .byte $00 ; fadeout
@@ -900,27 +912,19 @@ test_pattern_trackindex_start:
 .addr $0000 ; volume envelope address
 .byte 0 ; unused
 
+.byte $04 ; sample
+.word $FFF7 ; pitch adjust
+.byte $00 ; fadeout
+.byte $A0 ; volume
+.addr $0000 ; volume envelope address
+.byte 0 ; unused
+
 .byte $05 ; sample
 .word $FFF7 ; pitch adjust
 .byte $00 ; fadeout
 .byte $A0 ; volume
 .addr $0000 ; volume envelope address
 .byte 0 ; unused
-
-.byte $06 ; sample
-.word $FFF7 ; pitch adjust
-.byte $00 ; fadeout
-.byte $A0 ; volume
-.addr $0000 ; volume envelope address
-.byte 0 ; unused
-
-.byte $00 ; sample
-.word $FFF7 ; pitch adjust
-.byte $00 ; fadeout
-.byte $A0 ; volume
-.addr $0000 ; volume envelope address
-.byte 0 ; unused
-
 
 ;SILENT PATTERN
 test_pattern_silent: .byte $80|16 ; 16 silent rows
