@@ -317,6 +317,8 @@ rtl
 ShowCursor:
 	ldx TilemapOffset
 	stx CursorOffset
+	lda #24
+	sta HighlightLength
 	
 	lda #5
 	sta CursorX
