@@ -9,7 +9,7 @@
     - ~~`Sound driver sending data back telling where in the current phrase it is`~~ <sup>Done</sup>
     - ~~`Only transfer one phrase per channel at a time to the APU, buffer one beat before it changes in SPC code`~~ <sup>Done</sup>
 - Improved navigation
-    - Show adjacent views (chain preview from song view - chain and phrase are always visible at the same time)
+    - Show adjacent views (chain preview from song view - chain and phrase are always visible at the same time) <sup>In progress</sup>
     - "Channel bar" in the top, facilitates navigating between channels using L/R buttons (probably)
     - Navigate up down between sequential chains and phrases based on where in the song you are
     - Fresh insert on song or chain view will insert the next unused index
