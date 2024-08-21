@@ -5,13 +5,12 @@
 
 .segment "BSS"
 EditMode: .res 1
+HighlightLength: .res 1
 CursorX: .res 1
 CursorY: .res 1
 CursorSize: .res 1
 CursorOffset: .res 2
-HighlightLength: .res 1
-
-PrevCursorPositionOffset: .res 2
+PrevCursorPositionOffset: .res 4
 
 
 .segment "CODE7"
@@ -23,26 +22,30 @@ Init: .export Cursor_Init = Init
 rtl
 
 SetPaletteValues:
-sta 0
-lda #0
-xba
-lda HighlightLength
-tay
-lda 0
-:
-	sta f:TilemapBuffer+01,x
-	inx
-	inx
-	dey
-bne :-
+	sta 0
+	lda HighlightLength
+	pha
+	lda 0
+	:
+		sta f:TilemapBuffer+01,x
+		inx
+		inx
+		dec HighlightLength
+	bne :-
+	pla
+	sta HighlightLength
 rts
 
 UpdateCursorSpriteAndHighlight:
 
 ; TODO: On song view, highlight the whole column instead of the whole row, because the rows aren't tied together
 
+	seta16
+	and #2 ; Only cursor ID 0 or 2 allowed so far
+	tay
+	seta8
 	lda #0
-	ldx PrevCursorPositionOffset
+	ldx PrevCursorPositionOffset,Y
 	jsr SetPaletteValues
 
 	lda CursorY
@@ -54,10 +57,10 @@ UpdateCursorSpriteAndHighlight:
 	clc
 	adc CursorOffset
 	sta CursorOffset
+	sta PrevCursorPositionOffset,Y
 	tax
 	seta8
 	lda #1<<2
-	stx PrevCursorPositionOffset
 	jsr SetPaletteValues
 	
 	
@@ -68,6 +71,7 @@ UpdateCursorSpriteAndHighlight:
 	lsr
 	lsr
 	seta8
+	and #$F8
 	sec
 	sbc #3
 	sta OamBuffer+1

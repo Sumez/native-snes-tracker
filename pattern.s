@@ -701,22 +701,37 @@ ChangeCurrentCommandParam:
 	sta PatternCommandParams,x
 jmp NoteWasChanged
 
+.import Chain_MovePhraseUp, Chain_MovePhraseDown
 MoveCursorDown:
 	lda CursorPositionRow
 	inc
 	sta CursorPositionRow
 	cmp #$10
-	bne :+
-		; TODO: Move down in current chain
+	beq :+
+		jmp ShowCursor
+	:
+	
+	jsr Chain_MovePhraseDown
+	beq :+
 		stz CursorPositionRow
+		bra :++
+	:
+		lda #$0f
+		sta CursorPositionRow
 	:
 jmp ShowCursor
 
 MoveCursorUp:
 	dec CursorPositionRow
-	bpl :+
-		; TODO: Move up in current chain
-		lda #$f
+	bmi :+
+		jmp ShowCursor
+	:
+	jsr Chain_MovePhraseUp
+	bne :+
+		stz CursorPositionRow
+		bra :++
+	:
+		lda #$0f
 		sta CursorPositionRow
 	:
 jmp ShowCursor
@@ -775,6 +790,7 @@ ShowCursor:
 	:
 	sta CursorSize
 	
+	lda #2
 jmp UpdateCursorSpriteAndHighlight
 
 PreparePlayback_long: jsr PrepareTestPatternPlayback
@@ -802,7 +818,7 @@ UpdateHighlight_long: jsr UpdateBeatHighlight
 rtl
 UpdateBeatHighlight:
 	lda IsPlaying
-	beq @removeHighlight
+	bcc @removeHighlight
 	ldy #0
 	lda CurrentPhraseIndex
 	:

@@ -331,6 +331,7 @@ ShowCursor:
 	
 	stz CursorSize
 
+	lda #0
 jmp UpdateCursorSpriteAndHighlight
 
 .export Song_UpdateHighlight = UpdateHighlight

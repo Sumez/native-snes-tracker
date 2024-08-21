@@ -207,7 +207,11 @@ jmp MainLoop
 
 NavigateToScreen:
 	cmp CurrentScreen
-	beq @return
+	bne :+
+		; Can't navigate to "modal" view if it's already open. Main views don't have that limitation due to multi-view support
+		cmp #$10
+		bcs	@return
+	:
 	
 	pha
 	lda CurrentScreen
@@ -475,7 +479,7 @@ HandleInput:
 	@didNotPushStart:
 
 	lda ButtonPushed
-	and #KEY_L|KEY_R
+	and #KEY_R
 	beq :+
 		lda #$11
 		jmp NavigateToScreen

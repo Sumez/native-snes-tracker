@@ -127,6 +127,7 @@ CopyTestPatternsToSpcBuffer:
 rts
 
 PlaySinglePhrase:
+	phx
 	;Update the "current phrase" for playback visual feedback
 	sta PhraseOfChannel
 	;Also update reference list to play back changes while phrase is edited
@@ -148,6 +149,7 @@ PlaySinglePhrase:
 	sta IsPlaying
 	ldx #$ffff
 	jsr HighlightRow ; Highlight no rows until a view decides to
+	plx
 	jsl CompilePhraseToBuffer
 	jsr TransferEntirePlaybackBufferToSpcAndPlay
 rts

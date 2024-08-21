@@ -323,6 +323,7 @@ ShowCursor:
 	lda CursorRow
 	sta CursorY
 	stz CursorSize
+	lda #0
 jmp UpdateCursorSpriteAndHighlight
 
 HandleInput:

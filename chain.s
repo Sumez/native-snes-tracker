@@ -19,6 +19,7 @@ TransposeValues: .res $10
 CurrentChainIndex: .res 1
 CurrentChainIndexInGlobalSong: .res 2
 TilemapOffset: .res 2
+ChildTilemapOffset: .res 2
 
 .segment "CODE6"
 
@@ -52,8 +53,13 @@ rts
 
 .export Chain_LoadView = LoadView
 LoadView:
-	ldx z:LoadView_TilemapOffset
-	stx TilemapOffset
+seta16
+	lda z:LoadView_TilemapOffset
+	sta TilemapOffset
+	clc
+	adc #28
+	sta ChildTilemapOffset
+seta8
 	tya
 	cmp #$ff
 	beq :+
@@ -64,15 +70,11 @@ LoadView:
 
 rts
 
-.import Pattern_LoadView, Pattern_HideView
+.import Pattern_LoadView, Pattern_HideView, Pattern_FocusView
 UpdateChildView:
 
-	seta16
-	lda TilemapOffset
-	clc
-	adc #28
-	sta z:LoadView_TilemapOffset
-	seta8
+	ldx ChildTilemapOffset
+	stx z:LoadView_TilemapOffset
 	ldx CursorRow
 	lda PhraseIndexes,X
 	cmp #$ff
@@ -82,6 +84,11 @@ UpdateChildView:
 rtl
 	:
 		jsr Pattern_HideView
+rtl
+JumpToChildView:
+	ldx ChildTilemapOffset
+	stx z:LoadView_TilemapOffset
+	jsr Pattern_FocusView
 rtl
 
 LoadGlobalData:
@@ -196,8 +203,8 @@ NavigateToPhrase:
 	cmp #$ff
 	beq :+
 		tay
-		lda #2
-		jmp NavigateToScreen
+		jsl JumpToChildView
+		rts
 	:
 jmp PlayMosaic
 
@@ -346,7 +353,6 @@ MoveCursorDown:
 		stz CursorRow
 	:
 jmp ShowCursor
-
 MoveCursorUp:
 	dec CursorRow
 	bpl :+
@@ -355,6 +361,36 @@ MoveCursorUp:
 		sta CursorRow
 	:
 jmp ShowCursor
+.export Chain_MovePhraseDown = MovePhraseDown, Chain_MovePhraseUp = MovePhraseUp
+MovePhraseDown:
+	ldx CursorRow
+	cpx #$10
+	beq @no
+	lda PhraseIndexes+1,X
+	cmp #$ff
+	beq @no
+@yes:
+	jsr MoveCursorDown
+	lda #1
+rts
+@no:
+	; TODO: Ask Song
+	lda #0
+rts
+MovePhraseUp:
+	ldx CursorRow
+	beq @no
+	lda PhraseIndexes-1,X
+	cmp #$ff
+	beq @no
+@yes:
+	jsr MoveCursorUp
+	lda #1
+rts
+@no:
+	; TODO: Ask Song
+	lda #0
+rts
 
 ShowCursor_long: jsr ShowCursor
 rtl
@@ -376,6 +412,7 @@ ShowCursor:
 	
 	stz CursorSize
 
+	lda #0
 jmp UpdateCursorSpriteAndHighlight
 
 
@@ -386,6 +423,10 @@ rts
 UpdateHighlight_long: jsr UpdateHighlight
 rtl
 UpdateHighlight:
+	lda IsPlaying
+	asl
+	bcc @removeHighlight ; Not playing chain or song
+
 	seta16
 	ldy #0
 	:
@@ -407,5 +448,6 @@ UpdateHighlight:
 		cpy #16
 	bne :--
 	seta8
+	@removeHighlight:
 	lda #$ff
 jmp HighlightChainRow

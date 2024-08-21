@@ -138,6 +138,10 @@ UpdateInputStates:
 	ldy #@DasRepeat
 	lda JOY1CUR
 	sta ButtonStates
+	bit #KEY_L
+	beq :+
+		ldy #1 ; Fast repeat with L held
+	:
 	bit #KEY_DOWN
 	beq :+
 		dec Timer_Down
