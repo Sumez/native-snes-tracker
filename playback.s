@@ -144,9 +144,9 @@ PlaySinglePhrase:
 	sta PhraseOfChannel+12
 	sta PhraseOfChannel+14
 
-	lda #1 ; 1 indicates playing 1 pattern looped
+	lda #2 ; 2 indicates playing 1 pattern looped
 	sta IsPlaying
-	lda #$ff
+	ldx #$ffff
 	jsr HighlightRow ; Highlight no rows until a view decides to
 	jsl CompilePhraseToBuffer
 	jsr TransferEntirePlaybackBufferToSpcAndPlay
@@ -160,7 +160,7 @@ PlaySingleChain:
 	
 	lda #$80 ; $ff indicates playing full song is playing. $80 indicates just looping one chain
 	sta IsPlaying
-	lda #$ff
+	ldx #$ffff
 	jsr HighlightRow ; Highlight no rows until a view decides to
 
 	; Initialize chains with row requested by caller ([X])
@@ -231,6 +231,7 @@ PlayFullSong:
 	
 	lda #$ff ; $ff indicates playing full song is playing. $80 indicates just looping one chain
 	sta IsPlaying
+	ldx #$ffff
 	jsr HighlightRow ; Highlight no rows until a view decides to
 
 	; Initialize chains with row 0 of each channel in song
@@ -265,6 +266,8 @@ TransferSingleNoteToSpcAndPlay:
 	ldx #Pattern01Offset
 	ldy #8
 	jsr spcTransfer
+;	lda #1 ; #1 indicated playing one note
+;	sta IsPlaying
 	lda #0
 jmp BrewsicPlayTrack
 TransferEntirePlaybackBufferToSpcAndPlay:
@@ -498,9 +501,9 @@ CopyCurrentSongToSpcBuffer:
 ;$0000 ; volume envelope address
 ;0 ; unused
 		txa
-		ora #$F700
+		ora #$0000
 		sta CompiledPattern+0,Y
-		lda #$00FF
+		lda #$0000
 		sta CompiledPattern+2,Y
 		lda #$00A0
 		sta CompiledPattern+4,Y
@@ -803,9 +806,9 @@ rts
 ;+0 = instrument id, ;+1 = command id, ;+2 = command param, ;+3 = note
 		lda f:SOURCE+2,X
 		sta CompiledPattern+18+2,Y
-		and #$ff00 ; Check if note value is $ff
-		cmp #$ff00
-		bne :+
+		and #$ff00 ; Check if note value a note - or special command for tracker playback
+		cmp #$fc00
+		bcc :+
 ;			lda #$0080
 			lda f:SOURCE+0,X
 			and #$ff00
@@ -885,42 +888,42 @@ test_pattern_trackindex_start:
 
 ;INSTRUMENTS
 .byte $00 ; sample
-.word $FFF7 ; pitch adjust
+.word $0000 ; pitch adjust
 .byte $00 ; fadeout
 .byte $A0 ; volume
 .addr $0000 ; volume envelope address
 .byte 0 ; unused
 
 .byte $01 ; sample
-.word $FFF7 ; pitch adjust
+.word $0000 ; pitch adjust
 .byte $00 ; fadeout
 .byte $A0 ; volume
 .addr $0000 ; volume envelope address
 .byte 0 ; unused
 
 .byte $02 ; sample
-.word $FFF7 ; pitch adjust
+.word $0000 ; pitch adjust
 .byte $00 ; fadeout
 .byte $A0 ; volume
 .addr $0000 ; volume envelope address
 .byte 0 ; unused
 
 .byte $03 ; sample
-.word $FFF7 ; pitch adjust
+.word $0000 ; pitch adjust
 .byte $00 ; fadeout
 .byte $A0 ; volume
 .addr $0000 ; volume envelope address
 .byte 0 ; unused
 
 .byte $04 ; sample
-.word $FFF7 ; pitch adjust
+.word $0000 ; pitch adjust
 .byte $00 ; fadeout
 .byte $A0 ; volume
 .addr $0000 ; volume envelope address
 .byte 0 ; unused
 
 .byte $05 ; sample
-.word $FFF7 ; pitch adjust
+.word $0000 ; pitch adjust
 .byte $00 ; fadeout
 .byte $A0 ; volume
 .addr $0000 ; volume envelope address

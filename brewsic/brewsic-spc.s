@@ -840,9 +840,7 @@ BufferChannelRow:
 
 				bne :+
 					; Cut note (60)
-					mov a, !ChannelBits+x
-					or a, !NoteOff
-					mov !NoteOff, a
+					call !CutNote
 					;mov a, #0
 					;mov ChVolume+x, a
 					bra @end
@@ -1118,8 +1116,14 @@ JumpToNextPattern:
 	:
 return: ret
 
+CutNote:
+	mov a, !ChannelBits+x
+	or a, !NoteOff
+	mov !NoteOff, a
+ret
+
 NoteProgressionMacros:
-.byte 0,0,0,0,0,0
+.byte 0,0,0,0,0,0 ; Inaccessible! (instrument IDs up to 53 are accepted)
 .byte 253 ; 54 (-3)
 .byte 254 ; 55 (-2)
 .byte 255 ; 56 (-1)
@@ -1149,6 +1153,9 @@ ReadNote:
 		inc y
 		cmp a, #$ff ; TRK: Ineffecient way to indicate no note, but ensures constant pattern size for live edits in tracker
 		beq return
+		cmp a, #$fe ; TRK: Cut note
+		bne :+
+			jmp !CutNote
 	:
 	push y ; We need to free the Y register for the next few calculations
 

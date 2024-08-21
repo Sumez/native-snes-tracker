@@ -27,45 +27,6 @@ ldx #$0100
 	sta CGDATA
 	dex
 bne :-	
-	
-.macro writeColor value
-	lda #<value
-	sta CGDATA
-	lda #>value
-	sta CGDATA
-.endmacro
-
-
-	lda #$0
-	sta CGADDR
-	writeColor rgb(0,60,60) ; Background color
-	;writeColor rgb(60,188,252) ; Background color
-	;writeColor rgb(60,136,50) ; Background color
-	; Index 1
-	writeColor rgb(136,136,136)
-	writeColor rgb(50,50,50)
-
-	lda #$5
-	sta CGADDR
-	writeColor rgb(70,70,70)
-	writeColor rgb(20,20,20)
-
-;TODO: Test tile
-lda #$f
-sta CGADDR
-writeColor rgb(60,20,0) ; Background color
-
-
-
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
 
 jsr InitSnesmod
 ;jsr InitializeBitMask

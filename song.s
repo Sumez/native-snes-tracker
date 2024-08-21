@@ -12,6 +12,7 @@ ChainIndexes = SONG
 
 CursorPosition: .res 2
 LastEditedChain: .res 8
+TilemapOffset: .res 2
 
 .segment "CODE6"
 
@@ -28,8 +29,9 @@ Init:
 	stx CursorPosition
 rtl
 
-.export Song_LoadView = LoadView
-LoadView:
+.export Song_FocusView = FocusView
+FocusView:
+	jsr LoadView
 
 	Bind Input_StartPlayback, PlaySongFromSelectedRow
 	Bind Input_CustomHandler, HandleInput
@@ -39,9 +41,14 @@ LoadView:
 	
 	ldy #.loword(Name)
 	jsl WriteTilemapHeader
-	jsl WriteTilemapBuffer
 	jsl ShowCursor_long
+rts
 
+.export Song_LoadView = LoadView
+LoadView:
+	ldx z:LoadView_TilemapOffset
+	stx TilemapOffset
+	jsl WriteTilemapBuffer
 rts
 
 WriteTilemapBuffer:
@@ -308,16 +315,18 @@ ShowCursor_long: jsr ShowCursor
 rtl
 ShowCursor:
 
+	ldx TilemapOffset
+	stx CursorOffset
+	lda #24
+	sta HighlightLength
+
 	lda CursorPosition+1 ; Column/channel
 	sta 0
 	asl
 	adc 0 ; ASL+self = multiply by 3
-	adc #4
 	sta CursorX
 	
 	lda CursorPosition ; Row
-	clc
-	adc #4
 	sta CursorY
 	
 	stz CursorSize

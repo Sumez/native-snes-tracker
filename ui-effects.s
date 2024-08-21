@@ -7,6 +7,8 @@ MosaicTimer: .res 1
 HighlightRowIndex: .res 2
 ChannelHighlights: .res 8
 ChainHighlight: .res 1
+ShowBg3: .res 1
+Bg3Offset: .res 2
 
 .segment "CODE7"
 .export Vfx_Init = Init, Vfx_ResetOnNavigation = Reset, Vfx_Update = Update, Vfx_Update_Vblank = Update_Vblank
@@ -15,6 +17,7 @@ Init:
 	stz ScrollY
 	stz ScrollY+1
 	stz BopTimer
+	stz ShowBg3
 
 	lda #$ff
 	ldy #7
@@ -54,6 +57,15 @@ Reset:
 rtl
 
 Update_Vblank:
+@beatRowDark = rgb(1,5,7)
+@beatRowPlaying = rgb(1,6,10)
+.macro writeColor value
+	lda #<value
+	sta CGDATA
+	lda #>value
+	sta CGDATA
+.endmacro
+
 	lda IsPlaying
 	bne :+
 
@@ -63,10 +75,7 @@ Update_Vblank:
 
 		lda #$09
 		sta CGADDR
-		lda #$42
-		sta CGDATA
-		lda #$10
-		sta CGDATA
+		writeColor @beatRowDark
 		bra :++
 	:
 		lda #32
@@ -76,14 +85,11 @@ Update_Vblank:
 
 		lda #$09
 		sta CGADDR
-		lda #$84
-		sta CGDATA
-		lda #$20
-		sta CGDATA
+		writeColor @beatRowPlaying
 		
 		ldx HighlightRowIndex
 		bmi :+
-		LoadBlockToOffsetVRAM HighlightTiles, HighlightRowIndex, $40
+		LoadBlockToOffsetVRAM HighlightTiles, HighlightRowIndex, $18
 	:
 	
 	lda BopTimer
@@ -94,18 +100,26 @@ Update_Vblank:
 		sta ScrollY
 	
 	:
+	
+	lda ShowBg3
+	beq :+
+		lda #%00010110
+		bra :++
+	:
+		lda #%00010010
+	:
+	sta BLENDMAIN
 
 rts
 
 HighlightRow:
 	seta16
-	and #$ff
-	xba
-	lsr
-	lsr
-	clc
-	adc #Bg3TileMapBase
-	lsr
+	txa
+	bmi :+
+		clc
+		adc #Bg3TileMapBase-2
+		lsr
+	:
 	sta HighlightRowIndex
 	seta8
 rts
@@ -156,12 +170,13 @@ rts
 UpdateHighlights:
 
 	ldx #8 ; OamOffset
-	lda #38
+	lda #30
 	sta z:HighlightX
 	lda CurrentScreen
 	cmp #1
 	bne :+
 		lda IsPlaying
+		lsr
 		beq :+
 			lda ChainHighlight
 			bra :++

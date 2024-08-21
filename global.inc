@@ -11,6 +11,9 @@
 .global CurrentScreen, IsPlaying, CompiledPattern, TilemapBuffer, UiTilemapBuffer, EditMode
 .global Pattern01Offset ; Unsure about these
 
+; Temp variables
+LoadView_TilemapOffset = 0
+
 ; Global routines
 .global NavigateToScreen, NavigateToPreviousScreen, WriteTilemapHeader, WriteTilemapHeaderId
 
@@ -21,11 +24,39 @@
 .global TrackDataAddressInSpc
 
 ; Cursor stuff
-.global CursorX, CursorY, CursorSize, UpdateCursorSpriteAndHighlight
+.global CursorOffset, CursorX, CursorY, CursorSize, UpdateCursorSpriteAndHighlight, HighlightLength
 
 ; Fx stuff
-.global HighlightRow, HighlightChainRow, HighlightChannel
+.global HighlightRow, HighlightChainRow, HighlightChannel, ShowBg3, Bg3Offset
 .global PlayMosaic, Bop
+
+.macro _PrintHexNumber Target, Pad
+.local @notZero
+	pha
+	and #$F0
+	lsr
+	lsr
+	lsr
+	lsr
+	ora #$40
+.if Pad = 0
+	cmp #$40
+	bne @notZero
+		lda #'_'
+	@notZero:
+.endif
+	sta f:Target,X
+	pla
+	and #$0F
+	ora #$40
+	sta f:Target+2,X
+.endmacro
+.macro PrintHexNumber Target
+	_PrintHexNumber Target, 1
+.endmacro
+.macro PrintHexNumberNoPadding Target
+	_PrintHexNumber Target, 0
+.endmacro
 
 
 .macro Bind pointer, routine
@@ -69,7 +100,8 @@
 .global CalcCollisionDown, CalcCollisionRight, GetTilesBelow, GetTileInFront, InitializeBitMask
 
 
-.define rgb(red,green, blue) (red / 8) | ((green/8) << 5 )| ((blue/8) << 10)
+.define rgb256(red,green, blue) (red / 8) | ((green/8) << 5 )| ((blue/8) << 10)
+.define rgb(red,green, blue) red | (green << 5 )| (blue << 10)
 
 State_Falling = %00000001
 State_Jumping = %00000010
@@ -253,6 +285,7 @@ Bg4ChrBase = $0000
 .charmap 'z',$39
 .charmap '.',$3a
 .charmap '-',$3b
+.charmap '~',$3e
 .charmap '_',$3f ; Space
 
 .charmap '0',$40

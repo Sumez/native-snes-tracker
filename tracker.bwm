@@ -106,7 +106,7 @@
     <Pipeline>
       <Type>tilemap.custom</Type>
       <Output>gfx/font.inc</Output>
-      <LastProcessed>2024-08-17T13:52:18.3291535+02:00</LastProcessed>
+      <LastProcessed>2024-08-20T13:32:37.8323772+02:00</LastProcessed>
       <Property>
         <Key>script-type</Key>
         <Value>Python</Value>
@@ -279,7 +279,7 @@
       <Output>gfx/box.chr</Output>
       <Output>gfx/box.pal</Output>
       <Output>gfx/box.map</Output>
-      <LastProcessed>2024-08-17T13:57:37.6585832+02:00</LastProcessed>
+      <LastProcessed>2024-08-20T13:29:52.0967835+02:00</LastProcessed>
       <Property>
         <Key>DiscardRedundant</Key>
         <Value>1</Value>
@@ -328,5 +328,83 @@
     <Id>32</Id>
     <RelativePath>samples.s</RelativePath>
     <Mode>IncludeInAssembly</Mode>
+  </File>
+  <File>
+    <Id>33</Id>
+    <RelativePath>samples/perc_snare.wav</RelativePath>
+    <Mode>ContentPipeline</Mode>
+    <Pipeline>
+      <Type>audio.brr</Type>
+      <Output>samples/perc_snare.brr</Output>
+      <LastProcessed>2024-08-20T07:56:19.5511868+02:00</LastProcessed>
+      <Property>
+        <Key>sample-rate</Key>
+        <Value>32000</Value>
+      </Property>
+      <Property>
+        <Key>pitch</Key>
+        <Value />
+      </Property>
+      <Property>
+        <Key>max-size</Key>
+        <Value />
+      </Property>
+      <Property>
+        <Key>loop</Key>
+        <Value>0</Value>
+      </Property>
+    </Pipeline>
+  </File>
+  <File>
+    <Id>34</Id>
+    <RelativePath>samples/perc_hat_closed.wav</RelativePath>
+    <Mode>ContentPipeline</Mode>
+    <Pipeline>
+      <Type>audio.brr</Type>
+      <Output>samples/perc_hat_closed.brr</Output>
+      <LastProcessed>2024-08-20T07:56:19.5985783+02:00</LastProcessed>
+      <Property>
+        <Key>sample-rate</Key>
+        <Value>32000</Value>
+      </Property>
+      <Property>
+        <Key>pitch</Key>
+        <Value />
+      </Property>
+      <Property>
+        <Key>max-size</Key>
+        <Value />
+      </Property>
+      <Property>
+        <Key>loop</Key>
+        <Value>0</Value>
+      </Property>
+    </Pipeline>
+  </File>
+  <File>
+    <Id>35</Id>
+    <RelativePath>samples/bass_elec.wav</RelativePath>
+    <Mode>ContentPipeline</Mode>
+    <Pipeline>
+      <Type>audio.brr</Type>
+      <Output>samples/bass_elec.brr</Output>
+      <LastProcessed>2024-08-20T11:19:49.4807432+02:00</LastProcessed>
+      <Property>
+        <Key>sample-rate</Key>
+        <Value>32000</Value>
+      </Property>
+      <Property>
+        <Key>pitch</Key>
+        <Value />
+      </Property>
+      <Property>
+        <Key>max-size</Key>
+        <Value />
+      </Property>
+      <Property>
+        <Key>loop</Key>
+        <Value>0</Value>
+      </Property>
+    </Pipeline>
   </File>
 </BrewmasterProject>

@@ -9,7 +9,6 @@ Name: .byte "Phrase_-_",$ff
 
 .segment "BSS"
 
-PatternBuffer = TilemapBuffer + $100
 ;Needs init:
 Octaves: .res 10 ; Filled with 0->A
 Notes: .res 12 ; Filed with C->B
@@ -27,6 +26,7 @@ PatternCommandParams: .res 16
 CurrentPhraseIndex: .res 1
 CurrentPhraseIndexInSongData: .res 2
 SourcePointer: .res 3 ; far address source pointer necessary because phrase data is spread across multiple banks
+TilemapOffset: .res 2
 
 .segment "CODE6"
 
@@ -44,8 +44,29 @@ Init:
 	jsl InitiateNoteTileReferences
 rtl
 
+.export Pattern_FocusView = FocusView
+FocusView:
+	jsr LoadView
+
+	jsl PreparePlayback_long
+	ldy #.loword(Name)
+	jsl WriteTilemapHeader
+	lda CurrentPhraseIndex
+	jsl WriteTilemapHeaderId
+
+	Bind Input_StartPlayback, StartPlayback
+	Bind Input_CustomHandler, HandleInput
+	Bind Input_NavigateIn, NoAction
+	Bind Input_NavigateBack, ReturnToChainView
+	Bind OnPlaybackStopped, SwitchToSingleNoteMode
+
+	jsl ShowCursor_long
+rts
+
 .export Pattern_LoadView = LoadView
 LoadView:
+	ldx z:LoadView_TilemapOffset
+	stx TilemapOffset
 	tya
 	cmp #$ff
 	beq :+
@@ -53,27 +74,28 @@ LoadView:
 		jsl LoadGlobalData
 	:
 
-	Bind Input_StartPlayback, StartPlayback
-	Bind Input_CustomHandler, HandleInput
-	Bind Input_NavigateIn, NoAction
-	Bind Input_NavigateBack, ReturnToChainView
-	Bind OnPlaybackStopped, SwitchToSingleNoteMode
-	
-	jsl PreparePlayback_long
-	ldy #.loword(Name)
-	jsl WriteTilemapHeader
-	lda CurrentPhraseIndex
-	jsl WriteTilemapHeaderId
 	jsl WritePatternTilemapBuffer
+
+	;TODO: do better
+	seta16
+	lda TilemapOffset
+	and #$3C
+	clc
+	adc #Bg3TileMapBase
+	lsr
+	sta Bg3Offset
+	seta8
+	lda #1
+	sta ShowBg3
+	
 	jsl UpdateHighlight_long
-	jsl ShowCursor_long
-
-	;TODO: DELETE
-	wai
-	lda #%00010110
-	sta BLENDMAIN
-
 rts
+.export Pattern_HideView = HideView
+HideView:
+	jsl WriteEmptyTilemapBuffer
+	stz ShowBg3
+rts
+
 
 LoadGlobalData:
 @sourcePointer = 0
@@ -208,55 +230,47 @@ InitiateNoteTileReferences:
 	sta NotesSharp+11
 rtl
 
-TestData:
-	lda #$ff
-	ldx #15
+WriteEmptyTilemapBuffer:
+
+	ldx TilemapOffset
+
+	phb
+	lda #^TilemapBuffer
+	pha
+	plb
+
+	ldy #16
 	:
-		sta PatternNotes,x
-		dex
-	bpl :-
-	
-	lda #$00
-	ldx #7
-	:
-		sta PatternInstruments,x
-		dex
-	bpl :-
-	lda #$02
-	ldx #7
-	:
-		sta PatternInstruments+8,x
-		dex
-	bpl :-
-	
-	
-	lda #12*6
-	sta PatternNotes
-	lda #12*6+1
-	sta PatternNotes+2
-	lda #12*6+2
-	sta PatternNotes+4
-	lda #12*6+3
-	sta PatternNotes+6
-	lda #12*6
-	sta PatternNotes+8
-	lda #12*6+1
-	sta PatternNotes+10
-	lda #12*6+2
-	sta PatternNotes+12
-	lda #12*6+3
-	sta PatternNotes+14
-rts
+		lda #'_'
+		sta TilemapBuffer+0,X
+		sta TilemapBuffer+2,X
+		sta TilemapBuffer+4,X
+
+		sta TilemapBuffer+8,X
+		sta TilemapBuffer+10,X
+
+		sta TilemapBuffer+14,X
+		sta TilemapBuffer+16,X
+		sta TilemapBuffer+18,X
+		seta16
+		txa
+		clc
+		adc #$40
+		tax
+		seta8
+		dey
+	bne :-
+	plb
+rtl
 
 WritePatternTilemapBuffer:
-
 
 @currentNote = 0
 xba
 lda #0 ; Ensure $00 in register B for TAYs
 xba
 
-ldx #0
+ldx TilemapOffset
 ldy #0
 
 @rowLoop:
@@ -266,6 +280,8 @@ ldy #0
 	lda PatternNotes,Y
 	cmp #$ff
 	beq @noNote
+	cmp #$fe
+	beq @cutNote
 	
 		; First get octave tile
 		ldy #0
@@ -280,78 +296,65 @@ ldy #0
 		pha
 		; now A=Note and Y=Octave
 		lda Octaves,Y
-		sta f:PatternBuffer+12,x
+		sta f:TilemapBuffer+4,x
 		pla
 		tay
 		lda Notes,Y
-		sta f:PatternBuffer+8,x
+		sta f:TilemapBuffer+0,x
 		lda NotesSharp,Y
-		sta f:PatternBuffer+10,x
+		sta f:TilemapBuffer+2,x
 		
 		ldy @currentNote
 		lda PatternInstruments,Y
-		; TODO: Numberizer macro or routine
-		pha
-		and #$F0
-		lsr
-		lsr
-		lsr
-		lsr
-		ora #$40
-		sta f:PatternBuffer+16,x
-		pla
-		and #$0F
-		ora #$40
-		sta f:PatternBuffer+18,x
+		PrintHexNumber TilemapBuffer+8
 		
 	bra :+
+	@cutNote:
+	
+		;Note
+		lda #'~'
+		sta f:TilemapBuffer+2,x
+		lda #'_'
+		sta f:TilemapBuffer+0,x
+		sta f:TilemapBuffer+4,x
+		bra @noInstrument
+		
 	@noNote:
 	
 		;Note
 		lda #$1d
-		sta f:PatternBuffer+8,x
+		sta f:TilemapBuffer+0,x
 		lda #$1e
-		sta f:PatternBuffer+10,x
+		sta f:TilemapBuffer+2,x
 		lda #$1f
-		sta f:PatternBuffer+12,x
+		sta f:TilemapBuffer+4,x
 	
+		@noInstrument:
 		;Instrument
 		lda #$1d
-		sta f:PatternBuffer+16,x
+		sta f:TilemapBuffer+8,x
 		lda #$1f
-		sta f:PatternBuffer+18,x
+		sta f:TilemapBuffer+10,x
 
 	:
 	
 	lda PatternCommands,Y
 	beq @emptyCommand
-		and #$0F
-		ora #$40
-		sta f:PatternBuffer+22,x
+		dec ; 0=A,1=B,C,etc
+		sta f:TilemapBuffer+14,x
 	
 		lda PatternCommandParams,Y
-		pha
-		and #$F0
-		lsr
-		lsr
-		lsr
-		lsr
-		ora #$40
-		sta f:PatternBuffer+24,x
-		pla
-		and #$0F
-		ora #$40
-		sta f:PatternBuffer+26,x
+		PrintHexNumber TilemapBuffer+16
 		bra :+
 
 	@emptyCommand:
 		;Command
 		lda #$1d
-		sta f:PatternBuffer+22,x
+		sta f:TilemapBuffer+14,x
 		lda #$1e
-		sta f:PatternBuffer+24,x
+		sta f:TilemapBuffer+16,x
 		lda #$1f
-		sta f:PatternBuffer+26,x
+		sta f:TilemapBuffer+18,x
 
 	:
 
@@ -404,13 +407,14 @@ PlayCurrentNote:
 	
 	lda IsPlaying
 	bne :+ ; If currently playing, just don't do anything
+		jsr CutCurrentlyPlayingNote
 		jsr CompileCurrentNoteToBuffer
 		jsr TransferSingleNoteToSpcAndPlay
 	:
 rts
 CutCurrentlyPlayingNote:
 	lda IsPlaying
-	bne :+ ; If currently playing, just don't do anything
+	bne :+ ; If currently playing pattern, chain or song, just don't do anything
 		jsr StopPlayback
 	:
 rts
@@ -425,25 +429,42 @@ HandleInput:
 
 	lda ButtonPushed
 	bit #<KEY_X ; Key X removes current note
-	beq :+
-
+	beq @noX
+	
 			ldx CursorPositionRow
+			lda CursorPositionCol
+			cmp #2
+			bcc :+
+				
+				stz PatternCommandParams,X
+				stz PatternCommands,X
+				jmp NoteWasChanged
+			:
+
 			lda PatternNotes,x
 			cmp #$ff
-			beq :+ ; Don't do anything if bar is already empty
-				; TODO: If KEYOFF, don't store as most recent
+			beq @isEmpty
 				
-				sta LastEditedNote
-				lda PatternInstruments,x
-				sta LastEditedInstrument
+				cmp #$fe
+				beq :+
+					; Not empty, and not note-off, save note+instr in memory
+					sta LastEditedNote
+					lda PatternInstruments,x
+					sta LastEditedInstrument
+				:
 				
 				lda #$ff
-				sta PatternNotes,x
-				stz EditMode
-				jsr NoteWasChanged
-				jmp ShowCursor
-				;RETURNS - no more inputs read this frame
-	:
+				bra :+
+			@isEmpty:
+				; If bar is already empty, add KEYOFF
+				lda #$fe
+			:
+			sta PatternNotes,x
+			stz EditMode
+			jsr NoteWasChanged
+			jmp ShowCursor
+			;RETURNS - no more inputs read this frame
+	@noX:
 	
 	lda ButtonStates+1 ; Key Y enters edit mode while held
 	bit #>KEY_Y
@@ -468,8 +489,8 @@ HandleInput:
 			; Check if note exists, and if not, place the last one edited
 			ldx CursorPositionRow
 			lda PatternNotes,x
-			cmp #$ff
-			bne @playNote
+			cmp #$fc
+			bcc @playNote
 			
 				; No note exists. Use last edited
 				lda LastEditedNote
@@ -526,6 +547,12 @@ rts
 	cpx #1
 	bne @EditModeCommandIdCol
 	
+	ldx CursorPositionRow
+	lda PatternNotes,X
+	cmp #$fc ; Only allow change instrument if valid note on bar
+	bcs @return
+	
+	lda ButtonPushed+1
 	bit #>KEY_DOWN
 	beq :+
 		lda #(256-$10)
@@ -546,7 +573,7 @@ rts
 		lda #1
 		jmp ChangeCurrentInstrument
 	:
-rts
+@return: rts
 
 @EditModeCommandIdCol:
 	cpx #2
@@ -641,7 +668,8 @@ ChangeCurrentInstrument:
 		lda #0
 		bra :++
 	:
-	cmp #6 ; TODO: Number of instruments
+	cmp #6 ; TODO: Number of instruments (but maintain 53 as max)
+;	cmp #53 ; TODO: Number of instruments (but maintain 53 as max)
 	bcc :+
 		lda #6
 		dec
@@ -713,30 +741,34 @@ ShowCursor_long: jsr ShowCursor
 rtl
 ShowCursor:
 
+	ldx TilemapOffset
+	stx CursorOffset
+	lda #11
+	sta HighlightLength
+
 	lda CursorPositionRow
-	clc
-	adc #4
 	sta CursorY
 	lda CursorPositionCol
 	bne @notnote
-		lda #4
+		lda #0
 		sta CursorX
 		lda #1
 		bra :++
 	@notnote:
 		cmp #1
 		bne @notins
-		lda #8
+		lda #4
 		sta CursorX
 		bra :+
 	@notins:
 		cmp #2
 		bne @notcmdId
-		lda #11
+		lda #7
 		sta CursorX
-		bra :+
+		lda #1
+		bra :++
 	@notcmdId:
-		lda #12
+		lda #8
 		sta CursorX
 		:
 		lda #0
@@ -769,18 +801,28 @@ rts
 UpdateHighlight_long: jsr UpdateBeatHighlight
 rtl
 UpdateBeatHighlight:
+	lda IsPlaying
+	beq @removeHighlight
 	ldy #0
 	lda CurrentPhraseIndex
 	:
 		cmp Playback_CurrentPhraseOfChannel,y
 		bne :+
 			lda Playback_CurrentBeatRow
+			seta16
+			and #$ff
+			xba
+			lsr
+			lsr
 			clc
-			adc #4
+			adc TilemapOffset
+			tax
+			seta8
 			jmp HighlightRow
 		:
 		iny
 		cpy #8
 	bne :--
-	lda #$ff
+	@removeHighlight:
+	ldx #$ffff
 jmp HighlightRow

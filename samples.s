@@ -23,6 +23,7 @@ Name: .byte "Samples",$ff
 	NumberOfSamples: .res 2 ; That's a lotta samples :O :O :O
 	SamplesUpdated: .res 2
 	TotalSampleDataSizeInSpc: .res 2
+	TilemapOffset: .res 2
 	
 .segment "CODE6"
 
@@ -36,29 +37,33 @@ Init:
 	jsl LoadSamplesIntoSpcDuringInit
 rtl
 
-.export Samples_LoadView = LoadView
-LoadView:
-	ldx #0
-	stx CursorRow
-	stx SamplesUpdated
+.export Samples_FocusView = FocusView
+FocusView:
 
-	jsl LoadSamples ; Might as well load samples again in case someone loaded a savestate after patching rom with new samples
-	jsl LoadSongData
-	
+	jsr LoadView
+
 	Bind Input_CustomHandler, HandleInput
 	Bind Input_NavigateIn, NoAction
 	Bind Input_NavigateBack, NavigateBack
 	
 	ldy #.loword(Name)
 	jsl WriteTilemapHeader
-	
-	jsl WriteTilemapBuffer
+
+	ldx #0
+	stx CursorRow
+	stx SamplesUpdated
 	jsl ShowCursor_long
-	
-	;TODO: DELETE
-	wai
-	lda #%00010010
-	sta BLENDMAIN
+rts
+
+.export Samples_LoadView = LoadView
+LoadView:
+	ldx z:LoadView_TilemapOffset
+	stx TilemapOffset
+
+	jsl LoadSamples ; Might as well load samples again in case someone loaded a savestate after patching rom with new samples
+	jsl LoadSongData
+		
+	jsl WriteTilemapBuffer
 rts
 
 LoadSamples:
@@ -180,22 +185,32 @@ WriteTilemapBuffer:
 @samplePointer = 0
 @tilemapOffset = 3
 @directoryOffset = 5
-@tilemap = TilemapBuffer+$100
+@tilemap = TilemapBuffer+$100 ; Add a $100 buffer so we can target "previous row" without wrapping banks
+
+seta16
+	lda TilemapOffset
+	sec
+	sbc #$100
+	clc
+	adc #$10
+	sta @tilemapOffset
+seta8
 
 	phb
 	lda #^TilemapBuffer
 	pha
 	plb
 
-	ldy #$018
-	sty @tilemapOffset
+	ldy @tilemapOffset
 	ldx #0
 	stx @directoryOffset
 	@loop:
 		ldx @directoryOffset
 		lda f:SampleDirectory+2,X
 		cmp #$ff
-		beq @endLoop
+		bne :+
+			jmp @endLoop
+		:
 		sta z:@samplePointer+2
 		seta16
 		lda f:SampleDirectory+0,X
@@ -204,6 +219,7 @@ WriteTilemapBuffer:
 		stx z:DirectoryIndexToMatch
 		seta8
 		pha ; Store sample size
+		seta16
 		inx
 		inx
 		inx
@@ -212,23 +228,30 @@ WriteTilemapBuffer:
 		inx
 		stx @directoryOffset
 		
-		jsr FindAddedSample
+		jsr FindAddedSample ; Detect if the sample is already added to song, and store index on stack
+		lsr
 		pha
 		
-		seta16
 		lda @tilemapOffset
 		tax
 		clc
 		adc #$40
 		sta @tilemapOffset
-		seta8
 
 @sizeTextOffset = @tilemap+26
-@selectedMarkOffset = @tilemap-4
+@selectedMarkOffset = @tilemap-6
 
 		pla
-		sta @selectedMarkOffset,X
-
+		cmp #$7fff
+		seta8
+		bne :+
+			lda #'_'
+			sta @selectedMarkOffset+0,X
+			sta @selectedMarkOffset+2,X
+			bra :++
+		:
+			PrintHexNumber @selectedMarkOffset
+		:
 		ldy #0 ; Loop through sample name
 		@nameLoop:
 			lda [@samplePointer],Y
@@ -244,25 +267,11 @@ WriteTilemapBuffer:
 		:
 		ldx @tilemapOffset
 		pla
-		pha
-		and #$F0
-		lsr
-		lsr
-		lsr
-		lsr
-		ora #$40
-		cmp #$40
-		beq :+
-			sta @sizeTextOffset,X
-		:
-		pla
-		and #$0F
-		ora #$40
-		sta @sizeTextOffset-$40+2,X
+		PrintHexNumberNoPadding @sizeTextOffset-$40
 		lda #'k'
 		sta @sizeTextOffset-$40+4,X
 		
-	bra @loop
+	jmp @loop
 		
 	
 	@endLoop:
@@ -270,8 +279,8 @@ WriteTilemapBuffer:
 	plb
 rtl
 
+.a16
 FindAddedSample:
-	seta16
 	ldx #0 ; Check if sample is already added, and print its index
 	:
 		lda f:AddedSamples,X
@@ -283,22 +292,22 @@ FindAddedSample:
 		inx
 	bne :-
 	@match:
-		lda #'!'
+		txa ; Sample's index into AddedSamples
 		bra :+
 	@noMatch:
-		lda #'_'
+		;lda #$ffff ; $ffff is already in A. Indicates nothing found
 	:
-
-	seta8
 rts
 FindAddedSample_long: jsr FindAddedSample
 rtl
+.a8
 
 .segment "CODE7"
 NoAction: rts
 NavigateBack:
 	lda SamplesUpdated
 	beq :+
+		; TODO: Display friendly message on screen
 		jsr LoadSamplesIntoSpc
 	:
 jmp NavigateToPreviousScreen
@@ -306,11 +315,12 @@ jmp NavigateToPreviousScreen
 ShowCursor_long: jsr ShowCursor
 rtl
 ShowCursor:
-	lda #9
+	ldx TilemapOffset
+	stx CursorOffset
+	
+	lda #5
 	sta CursorX
 	lda CursorRow
-	clc
-	adc #4
 	sta CursorY
 	stz CursorSize
 jmp UpdateCursorSpriteAndHighlight
@@ -368,10 +378,8 @@ ToggleAddedSample:
 	seta16
 	jsr GetHighlightedSample
 	sta DirectoryIndexToMatch
-	seta8
 	jsl FindAddedSample_long
-	cmp #'_'
-	seta16
+	cmp #$ffff
 	beq :+
 		jsr @removeSample
 		bra @end
@@ -479,9 +487,10 @@ CopySamplesToSpcBuffer:
 		jsr StopPlayback
 	:
 	
-	ldx #$ffff
-	jsl FindAddedSample_long ; By searching for $ffff, X will give us half the length of the sample directory (added samples are 2 bytes per sample, sample dir is 4)
 	seta16
+	lda #$ffff
+	sta z:DirectoryIndexToMatch
+	jsl FindAddedSample_long ; By searching for $ffff, X will give us half the length of the SPC's sample directory (added samples are 2 bytes per sample, sample dir is 4)
 	txa
 	ldx #0
 	stx z:@CurrentSampleDirectoryOffset

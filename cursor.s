@@ -8,6 +8,8 @@ EditMode: .res 1
 CursorX: .res 1
 CursorY: .res 1
 CursorSize: .res 1
+CursorOffset: .res 2
+HighlightLength: .res 1
 
 PrevCursorPositionOffset: .res 2
 
@@ -22,25 +24,17 @@ rtl
 
 SetPaletteValues:
 sta 0
+lda #0
+xba
+lda HighlightLength
+tay
+lda 0
 :
-	lda 0
 	sta f:TilemapBuffer+01,x
-	sta f:TilemapBuffer+03,x
-	sta f:TilemapBuffer+05,x
-	sta f:TilemapBuffer+07,x
-	sta f:TilemapBuffer+09,x
-	sta f:TilemapBuffer+11,x
-	sta f:TilemapBuffer+13,x
-	sta f:TilemapBuffer+15,x
-
-	seta16
-	txa
-	clc
-	adc #$10
-	tax
-	bit #$39
-	seta8
-	bne :-
+	inx
+	inx
+	dey
+bne :-
 rts
 
 UpdateCursorSpriteAndHighlight:
@@ -57,6 +51,9 @@ UpdateCursorSpriteAndHighlight:
 	xba
 	lsr
 	lsr
+	clc
+	adc CursorOffset
+	sta CursorOffset
 	tax
 	seta8
 	lda #1<<2
@@ -65,16 +62,21 @@ UpdateCursorSpriteAndHighlight:
 	
 	
 	.import RefreshOam
-	lda CursorY
-	asl
-	asl
-	asl
+	seta16
+	lda CursorOffset
+	lsr
+	lsr
+	lsr
+	seta8
 	sec
 	sbc #3
 	sta OamBuffer+1
 	sta OamBuffer+1+4
 
-	lda CursorX
+	lda CursorOffset
+	lsr
+	clc
+	adc CursorX
 	asl
 	asl
 	asl

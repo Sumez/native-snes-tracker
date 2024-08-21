@@ -14,6 +14,7 @@
     - Navigate up down between sequential chains and phrases based on where in the song you are
     - Fresh insert on song or chain view will insert the next unused index
     - Button to copy an inserted chain or phrase to a new one (if another entry exists)
+    - Hold Delete while moving cursor to delete multiple
 - Rudimentary GUI
     - More pleasant temporary graphics
     - Visible UI hints for easier navigation
@@ -22,7 +23,7 @@
     - `Convert tracker font to 2bpp and move to BG3 layer, use BG2 for UI graphics`
 - Basic tracker commands
     - Implement the ones already supported in the sound driver first - Pitch up/down, volume slide, arpeggio - loop and tempo change should be in song data instead?
-    - "Key off" entries
+    - ~~"Key off" entries~~ <sup>Done</sup>
 - Edit instruments in tracker
 - Improved sound driver
     - Better use of keyoff/keyon control instead of manual volume
@@ -30,7 +31,7 @@
     - Transpose chains
 - Companion software for adding custom samples
     - Ability to add as many samples as ExHiRom can fit
-    - Manually pick which samples to include in a song in the song settings inside the tracker
+    - ~~Manually pick which samples to include in a song in the song settings inside the tracker~~ <sup>Done</sup>
     - ~~`Rewrite to use HiRom or ExHiRom`~~ <sup>Done</sup>
 - Make various SNES specific features available, make controlling DSP registers more direct using commands
 - Meta data
@@ -50,3 +51,5 @@
 - Hardware noise channel
 - Live mode
 - Pre-emphasize samples to counterbalance the SNES DSP's gaussian filter
+- VJ mode?
+- 2-Player controls

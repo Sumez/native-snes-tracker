@@ -1,5 +1,6 @@
 obj/
 bin/
-music/
-/.vs
+.vs/
 *.ps1
+/music/
+/samples/*

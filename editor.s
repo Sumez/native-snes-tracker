@@ -109,6 +109,8 @@ LoadBlockToOAM OamBuffer, 544
 	jsr LoadPalettes
 	
 	jsl LoadBackgroundUi
+	ldx #Bg3TileMapBase>>1
+	stx Bg3Offset
 	jsl CopyTilemapToUiLayer
 
 	
@@ -343,7 +345,7 @@ CopyEntireTilemap:
 	LoadBlockToVRAM TilemapBuffer, Bg2TileMapBase, 32*32*2
 rtl
 CopyTilemapToUiLayer:
-	LoadBlockToVRAM UiTilemapBuffer, Bg3TileMapBase, 32*32*2
+	LoadBlockToOffsetVRAM UiTilemapBuffer, Bg3Offset, 32*32*2
 rtl
 
 .segment "CODE6"
@@ -352,33 +354,33 @@ LoadBackgroundUi:
 	jsr ClearUiTilemap
 	seta16
 	lda #$08df
-	ldx #$106
+	ldx #$0FE
 	:
 		sta f:UiTilemapBuffer,x
 		inx
 		inx
-		cpx #$11e
+		cpx #$116
 	bne :-
-	ldx #$206
+	ldx #$1FE
 	:
 		sta f:UiTilemapBuffer,x
 		inx
 		inx
-		cpx #$21e
+		cpx #$216
 	bne :-
-	ldx #$306
+	ldx #$2FE
 	:
 		sta f:UiTilemapBuffer,x
 		inx
 		inx
-		cpx #$31e
+		cpx #$316
 	bne :-
-	ldx #$406
+	ldx #$3FE
 	:
 		sta f:UiTilemapBuffer,x
 		inx
 		inx
-		cpx #$41e
+		cpx #$416
 	bne :-
 	seta8
 rtl
@@ -396,7 +398,7 @@ rts
 
 ClearTilemap:
 	seta16
-	lda #$3f ; Blank space
+	lda #'_' ; Blank space
 	ldx #((32*32*2)-2)
 	:
 		sta f:TilemapBuffer,x
@@ -439,11 +441,14 @@ rtl
 
 LoadView:
 	jsr ClearTilemap
+	stz ShowBg3
+	ldx #$108
+	stx z:LoadView_TilemapOffset
 	jumpTable ViewLoaders
 rtl
-ViewLoaders: .import Song_LoadView, Chain_LoadView, Pattern_LoadView, Samples_LoadView
-.addr Song_LoadView, Chain_LoadView, Pattern_LoadView, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-.addr 0, Samples_LoadView
+ViewLoaders: .import Song_FocusView, Chain_FocusView, Pattern_FocusView, Samples_FocusView
+.addr Song_FocusView, Chain_FocusView, Pattern_FocusView, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+.addr 0, Samples_FocusView
 
 .segment "CODE7"
 HandleInput:

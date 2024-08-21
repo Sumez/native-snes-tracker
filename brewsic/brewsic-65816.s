@@ -195,10 +195,10 @@ transfer:
 	stx @sourceAddress
 
 	ldx #1 ; Y will never match 1, so loop bit will never be set
-	cmp #0
-	beq :+
+	cmp #0 ; if A != 0, this is a stream tick
+	beq :+ ; 
 		ldx #290 ; NTSC
-		lda $213F
+		lda $213F ; Ask PPU if console is PAL or NTSC
 		and #%00010000 ; PAL/NTSC bit
 		beq :+
 			ldx #350 ; PAL

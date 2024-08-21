@@ -1,0 +1,1 @@
+dotnet publish --configuration Release -r win-x64 -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:ReadyToRun=true -p:PublishTrimmed=true -p:CopyOutputSymbolsToPublishDirectory=false --self-contained true

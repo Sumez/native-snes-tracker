@@ -8,7 +8,6 @@ Name: .byte "Chain_-_",$ff
 
 .segment "BSS"
 
-ChainTilesBuffer = TilemapBuffer + $102
 ;Needs init:
 CursorRow: .res 2
 LastEditedPhrase: .res 1
@@ -19,6 +18,7 @@ PhraseIndexes: .res $10
 TransposeValues: .res $10
 CurrentChainIndex: .res 1
 CurrentChainIndexInGlobalSong: .res 2
+TilemapOffset: .res 2
 
 .segment "CODE6"
 
@@ -31,35 +31,58 @@ Init:
 	stx CursorRow
 rtl
 
-.export Chain_LoadView = LoadView
-LoadView:
-	tya
-	cmp #$ff
-	beq :+
-		jsl LoadGlobalData
-	:
+.export Chain_FocusView = FocusView
+FocusView:
+	jsr LoadView
 	
+	ldy #.loword(Name)
+	jsl WriteTilemapHeader
+	lda CurrentChainIndex
+	jsl WriteTilemapHeaderId
+
 	Bind Input_StartPlayback, StartPlayback
 	Bind Input_CustomHandler, HandleInput
 	Bind Input_NavigateIn, NavigateToPhrase
 	Bind Input_NavigateBack, NavigateToSong
 	Bind OnPlaybackStopped, NoAction
 	
-	ldy #.loword(Name)
-	jsl WriteTilemapHeader
-	lda CurrentChainIndex
-	jsl WriteTilemapHeaderId
-	
-	jsl WriteTilemapBuffer
 	jsl UpdateHighlight_long
 	jsl ShowCursor_long
-	
-	;TODO: DELETE
-	wai
-	lda #%00010010
-	sta BLENDMAIN
+rts
+
+.export Chain_LoadView = LoadView
+LoadView:
+	ldx z:LoadView_TilemapOffset
+	stx TilemapOffset
+	tya
+	cmp #$ff
+	beq :+
+		jsl LoadGlobalData
+	:
+		
+	jsl WriteTilemapBuffer
 
 rts
+
+.import Pattern_LoadView, Pattern_HideView
+UpdateChildView:
+
+	seta16
+	lda TilemapOffset
+	clc
+	adc #28
+	sta z:LoadView_TilemapOffset
+	seta8
+	ldx CursorRow
+	lda PhraseIndexes,X
+	cmp #$ff
+	beq :+
+		tay
+		jsr Pattern_LoadView
+rtl
+	:
+		jsr Pattern_HideView
+rtl
 
 LoadGlobalData:
 	; Copy selected chain data to temp memory
@@ -107,32 +130,21 @@ rtl
 WriteTilemapBuffer:
 
 	ldy #0
-	ldx #8
+	ldx TilemapOffset
 	@rowLoop:
 		
 		lda PhraseIndexes,Y
 		cmp #$ff
 		beq :+
 			; Write the number
-			pha
-			and #$F0
-			lsr
-			lsr
-			lsr
-			lsr
-			ora #$40
-			sta f:ChainTilesBuffer,x
-			pla
-			and #$0F
-			ora #$40
-			sta f:ChainTilesBuffer+2,x
+			PrintHexNumber TilemapBuffer
 			bra :++
 		:
 			; Empty cell	
 			lda #$1d
-			sta f:ChainTilesBuffer,x
+			sta f:TilemapBuffer,x
 			lda #$1f
-			sta f:ChainTilesBuffer+2,x
+			sta f:TilemapBuffer+2,x
 		:
 
 		seta16
@@ -348,12 +360,18 @@ ShowCursor_long: jsr ShowCursor
 rtl
 ShowCursor:
 
-	lda #5
+	jsl UpdateChildView
+
+	ldx TilemapOffset
+	stx CursorOffset
+	
+	lda #2
+	sta HighlightLength
+
+	lda #0
 	sta CursorX
 	
 	lda CursorRow
-	clc
-	adc #4
 	sta CursorY
 	
 	stz CursorSize
