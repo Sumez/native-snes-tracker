@@ -1,0 +1,60 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+						 xmlns:vm="clr-namespace:Patcher.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+						 x:DataType="vm:SampleFile"
+             x:Class="Patcher.Controls.SampleFile">
+	<UserControl.Styles>
+		<Style Selector="TextBox,AutoCompleteBox">
+			<Style Selector="^.invalid">
+				<Setter Property="Foreground" Value="Red"/>
+				<Style Selector="^ TextBox:focus">
+						<Setter Property="Foreground" Value="Red"/>
+				</Style>
+			</Style>
+			<Setter Property="BorderThickness" Value="0" />
+			<Style Selector="^:focus /template/ Border#PART_BorderElement">
+				<Setter Property="BorderThickness" Value="0" />
+			</Style>
+		</Style>
+	</UserControl.Styles>
+	<Border Height="50" Background="LightGray" CornerRadius="2" BorderThickness="1" Padding="5">
+		<DockPanel>
+			<StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="5">
+				<Button
+					Name="OriginalPlayButton"
+					ToolTip.Tip="Play original" ToolTip.ShowDelay="100"
+					IsVisible="{Binding UncompressedSourceFile, Converter={x:Static ObjectConverters.IsNotNull}}"
+					Click="PlayUncompressed">
+					<Polygon Points="2,2 8,8 2,15 2,2" Margin="2,0" Fill="CornflowerBlue" />
+				</Button>
+				<Button
+					Name="CompressedPlayButton"
+					ToolTip.Tip="Preview compressed sample" ToolTip.ShowDelay="100"
+					IsEnabled="{Binding BrrSample, Converter={x:Static ObjectConverters.IsNotNull}}"
+					Click="Play"
+					VerticalAlignment="Stretch">
+					<Polygon Points="3,3 13,13 3,23 3,3" Margin="2,0" Fill="Black" />
+				</Button>
+			</StackPanel>
+			<StackPanel Spacing="5">
+				<StackPanel Orientation="Horizontal">
+					<TextBlock FontWeight="Bold" Text="{Binding Name}"/>
+				</StackPanel>
+				<StackPanel Orientation="Horizontal" Spacing="3">
+					<TextBlock Text="{Binding CompressedSize}" MinWidth="100"/>
+					<AutoCompleteBox
+						Name="Bitrate"
+						FilterMode="ContainsOrdinal"
+						Text="{Binding CompressionBitRate}"
+						Height="18" Width="40" Padding="15,7,2,0"
+						IsVisible="{Binding UncompressedSourceFile, Converter={x:Static ObjectConverters.IsNotNull}}">
+					</AutoCompleteBox>
+					<TextBlock Text="kbps"/>
+				</StackPanel>
+			</StackPanel>
+		</DockPanel>
+	</Border>
+</UserControl>

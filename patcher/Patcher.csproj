@@ -16,4 +16,8 @@
     <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
     <PackageReference Condition="'$(Configuration)' == 'Debug'" Include="Avalonia.Diagnostics" Version="11.1.0" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\source\repos\ide-temp\Brewsic\Brewsic.csproj" />
+  </ItemGroup>
 </Project>

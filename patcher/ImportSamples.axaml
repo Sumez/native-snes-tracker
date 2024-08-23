@@ -1,0 +1,30 @@
+<Window xmlns="https://github.com/avaloniaui"
+				xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+				xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+				xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+				xmlns:vm="clr-namespace:Patcher.ViewModels"
+				xmlns:Patcher="clr-namespace:Patcher.Controls"
+				mc:Ignorable="d"
+				Width="300"
+				Height="450"
+				CanResize="false"
+				x:Class="Patcher.ImportSamples"
+				x:DataType="vm:SampleFileCollection"
+				Title="Import Samples">
+		<DockPanel>
+			<Button DockPanel.Dock="Bottom" HorizontalAlignment="Stretch">Add selected samples</Button>
+			<Border>
+				<ScrollViewer Padding="5,0">
+				<ItemsControl ItemsSource="{Binding}">
+					<ItemsControl.ItemTemplate>
+						<DataTemplate x:DataType="vm:SampleFile">
+							<Panel Margin="0,5">
+								<Patcher:SampleFile DataContext="{Binding}" />
+							</Panel>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+				</ScrollViewer>
+			</Border>
+		</DockPanel>
+</Window>

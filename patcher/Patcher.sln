@@ -4,17 +4,31 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.6.33723.286
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Patcher", "Patcher.csproj", "{75B25296-93A8-43B1-8F00-DF59F5C08906}"
+	ProjectSection(ProjectDependencies) = postProject
+		{0508927B-5633-42C8-B718-2A153DC3D6DF} = {0508927B-5633-42C8-B718-2A153DC3D6DF}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Brewsic", "..\..\..\..\..\source\repos\ide-temp\Brewsic\Brewsic.csproj", "{0508927B-5633-42C8-B718-2A153DC3D6DF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
+		Prevent Errorhandling|Any CPU = Prevent Errorhandling|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{75B25296-93A8-43B1-8F00-DF59F5C08906}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{75B25296-93A8-43B1-8F00-DF59F5C08906}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{75B25296-93A8-43B1-8F00-DF59F5C08906}.Prevent Errorhandling|Any CPU.ActiveCfg = Debug|Any CPU
+		{75B25296-93A8-43B1-8F00-DF59F5C08906}.Prevent Errorhandling|Any CPU.Build.0 = Debug|Any CPU
 		{75B25296-93A8-43B1-8F00-DF59F5C08906}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{75B25296-93A8-43B1-8F00-DF59F5C08906}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0508927B-5633-42C8-B718-2A153DC3D6DF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0508927B-5633-42C8-B718-2A153DC3D6DF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0508927B-5633-42C8-B718-2A153DC3D6DF}.Prevent Errorhandling|Any CPU.ActiveCfg = Prevent Errorhandling|Any CPU
+		{0508927B-5633-42C8-B718-2A153DC3D6DF}.Prevent Errorhandling|Any CPU.Build.0 = Prevent Errorhandling|Any CPU
+		{0508927B-5633-42C8-B718-2A153DC3D6DF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0508927B-5633-42C8-B718-2A153DC3D6DF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
