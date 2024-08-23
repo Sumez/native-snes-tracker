@@ -874,7 +874,7 @@ Pattern01Index = test_pattern_single_note - test_pattern_trackindex_start
 SilentPatternIndex = test_pattern_silent - test_pattern_trackindex_start
 
 ;HEADER
-.byte $06,$50, $60,$20, $60,$20, $60,$20, $60,$20, $60,$20, $60,$20, $60,$20, $60,$20
+.byte $06,$50, $40,$20, $40,$20, $40,$20, $40,$20, $40,$20, $40,$20, $40,$20, $40,$20
 
 ;ORDERS
 test_pattern_trackindex_start:

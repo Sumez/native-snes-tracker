@@ -17,6 +17,8 @@ CursorPositionCol: .res 2
 CursorPositionRow: .res 2
 LastEditedNote: .res 1
 LastEditedInstrument: .res 1
+LastEditedCommand: .res 1
+LastEditedCommandParam: .res 1
 
 ;Loaded when view loads:
 PatternNotes: .res 16
@@ -40,6 +42,8 @@ Init:
 	lda #(12*4)
 	sta LastEditedNote
 	stz LastEditedInstrument
+	stz LastEditedCommand
+	stz LastEditedCommandParam
 	
 	jsl InitiateNoteTileReferences
 rtl
@@ -337,10 +341,12 @@ ldy #0
 		sta f:TilemapBuffer+10,x
 
 	:
-	
+	phx
 	lda PatternCommands,Y
 	beq @emptyCommand
-		dec ; 0=A,1=B,C,etc
+		tax
+		lda f:CommandCharacter,x
+		plx
 		sta f:TilemapBuffer+14,x
 	
 		lda PatternCommandParams,Y
@@ -348,7 +354,7 @@ ldy #0
 		bra :+
 
 	@emptyCommand:
-		;Command
+		plx
 		lda #$1d
 		sta f:TilemapBuffer+14,x
 		lda #$1e
@@ -374,7 +380,8 @@ jmp @rowLoop
 :
 
 rtl
-
+CommandCharacter:
+.byte 0,"TxXSpPVXxA"
 
 .segment "CODE7"
 
@@ -434,8 +441,14 @@ HandleInput:
 			ldx CursorPositionRow
 			lda CursorPositionCol
 			cmp #2
-			bcc :+
+			bcc :++
 				
+				lda PatternCommands,X
+				beq :+
+					sta LastEditedCommand
+					lda PatternCommandParams,X
+					sta LastEditedCommandParam
+				:
 				stz PatternCommandParams,X
 				stz PatternCommands,X
 				jmp NoteWasChanged
@@ -482,12 +495,27 @@ HandleInput:
 			lda #1
 			sta EditMode
 
+			ldx CursorPositionRow
 			lda CursorPositionCol
 			cmp #2
-			bcs @showCursor ; If command or command param column, don't insert or play notes
-			
+			bcc :++
+			 	; If command or command param column, don't insert or play notes, but do load or save latest from/to memory
+				lda PatternCommands,x
+				beq :+
+					sta LastEditedCommand
+					lda PatternCommandParams,x
+					sta LastEditedCommandParam
+					jsr NoteWasChanged
+					bra @showCursor
+				:
+					lda LastEditedCommand
+					sta PatternCommands,x
+					lda LastEditedCommandParam
+					sta PatternCommandParams,x
+					jsr NoteWasChanged
+					bra @showCursor
+			:
 			; Check if note exists, and if not, place the last one edited
-			ldx CursorPositionRow
 			lda PatternNotes,x
 			cmp #$fc
 			bcc @playNote
@@ -692,6 +720,11 @@ ChangeCurrentCommand:
 		dec
 	:
 	sta PatternCommands,x
+	beq :+
+		sta LastEditedCommand
+		lda PatternCommandParams,x
+		sta LastEditedCommandParam
+	:
 jmp NoteWasChanged
 
 ChangeCurrentCommandParam:
@@ -699,6 +732,13 @@ ChangeCurrentCommandParam:
 	clc
 	adc PatternCommandParams,x
 	sta PatternCommandParams,x
+
+	lda PatternCommands,x
+	beq :+
+		sta LastEditedCommand
+		lda PatternCommandParams,x
+		sta LastEditedCommandParam
+	:
 jmp NoteWasChanged
 
 .import Chain_MovePhraseUp, Chain_MovePhraseDown

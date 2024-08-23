@@ -78,10 +78,8 @@ Update_Vblank:
 		writeColor @beatRowDark
 		bra :++
 	:
-		lda #32
 		stz CGADDR
-		stz CGDATA
-		sta CGDATA
+		writeColor rgb(1,3,4)
 
 		lda #$09
 		sta CGADDR

@@ -20,7 +20,7 @@ TickCountDown: .res 1
 TrackSpeed: .res 1
 ChEffect: .res Channels
 ChEffectParam: .res Channels
-CurrentChannelVolumeAdjust: .res 1
+CurrentChannelVolumeOverride: .res 1
 TrackTempo: .res 1
 TickCountUp: .res 1
 EffectCounter: .res 1
@@ -737,7 +737,7 @@ BufferChannelRow:
 	mov ChEffect+x, a
 	mov ChEffectParam+x, a
 	mov a, #$ff
-	mov CurrentChannelVolumeAdjust, a ; Default to $ff (no adjustment) on new notes if no volume column was read
+	mov CurrentChannelVolumeOverride, a ; Default to $ff (no adjustment) on new notes if no volume column was read
 
 	mov a, ChClearCounter+x
 	bne @decClearCounter
@@ -811,7 +811,7 @@ BufferChannelRow:
 			; has volume effect
 			mov a, [CurrentPatternPointer]+y ; Read volume effect byte
 			inc y
-			mov CurrentChannelVolumeAdjust, a
+			mov CurrentChannelVolumeOverride, a
 			mov ChVolume+x, a ; Store in volume info also, in case no new note is read
 		:
 		mov a, Temp
@@ -864,12 +864,14 @@ ret
 EffectRoutines:
 	.addr NoEffect
 	.addr SetSpeed			;A
-	.addr JumpToPattern		;B
-	.addr JumpToNextPattern	;C
+	.addr NoEffect
+	;.addr JumpToPattern		;B
+	.addr NoEffect
+	;.addr JumpToNextPattern	;C
 	.addr VolumeSlide		;D
 	.addr PitchDown			;E
 	.addr PitchUp			;F
-	.addr NoEffect	;G
+	.addr VolumeAdjust
 	.addr NoEffect	;H
 	.addr NoEffect	;I
 	.addr Arpeggio			;J
@@ -1025,6 +1027,11 @@ PitchDown:
 		mov ChPitchL+x, a
 		mov ChPitchH+x, a
 	:
+ret
+VolumeAdjust:
+	push y
+	pop x
+	mov ChVolume+x, a
 ret
 VolumeSlide:
 @sub = Temp
@@ -1224,7 +1231,7 @@ ReadNote:
 	mov ChPitchH+x, a
 	mov !ChOrigPitchH+x, a ; Stored for use in arp commands
 	
-	mov a, CurrentChannelVolumeAdjust
+	mov a, CurrentChannelVolumeOverride
 	cmp a, #$ff
 	bne :+
 		mov a, !ChCurrentInstrumentVolume+x
