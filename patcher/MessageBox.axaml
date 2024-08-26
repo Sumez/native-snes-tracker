@@ -4,6 +4,12 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="Patcher.MessageBox"
+				Width="500"
+				Height="100"
+				CanResize="false"
         Title="MessageBox">
-  {{ Message }}
+	<StackPanel VerticalAlignment="Center" Spacing="10">
+		<TextBlock Name="Message" HorizontalAlignment="Center"></TextBlock>
+		<Button Click="CloseWindow" HorizontalAlignment="Center">Ok then</Button>
+	</StackPanel>
 </Window>

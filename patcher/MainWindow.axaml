@@ -4,28 +4,52 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 				xmlns:vm="clr-namespace:Patcher.ViewModels"
 				xmlns:Patcher="clr-namespace:Patcher.Controls"
-        mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="600"
+        mc:Ignorable="d" d:DesignWidth="300" d:DesignHeight="800"
         x:Class="Patcher.MainWindow"
 				x:DataType="vm:Patch"
-				MaxWidth="300"
-				Width="300"
-				Height="600"
+				DragDrop.AllowDrop="True"
+				MaxWidth="350"
+				MinWidth="350"
+				Width="350"
+				Height="800"
         Title="Margaret Patcher">
+	<Window.Styles>
+		<Style Selector="Border.DropArea">
+			<Setter Property="Background" Value="WhiteSmoke"/>
+			<Style Selector="^.DragOver">
+				<Setter Property="Background" Value="LightGray"/>
+			</Style>
+		</Style>
+		<Style Selector="Button">
+			<Setter Property="Background" Value="LightSteelBlue" />
+			<Setter Property="Foreground" Value="MidnightBlue" />
+			<Style Selector="^:pointerover /template/ Border#PART_BorderElement">
+				<Setter Property="Background" Value="Black" />
+			</Style>
+		</Style>
+	</Window.Styles>
 	<DockPanel>
-		<Button DockPanel.Dock="Top" IsVisible="false" Margin="10" HorizontalAlignment="Stretch" Click="PickRomImage">Pick ROM image to patch</Button>
-		<Border Name="SampleSources" BorderBrush="Gray" BorderThickness="1" DragDrop.AllowDrop="True">
+		<Border DockPanel.Dock="Top" IsVisible="{Binding RomFilePath, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="5" Padding="5" CornerRadius="4" BorderThickness="0" Background="WhiteSmoke">
+			<StackPanel Orientation="Horizontal">
+				<TextBlock Text="Patching: " />
+				<TextBlock FontWeight="Bold" Text="{Binding RomFileName}" />
+			</StackPanel>
+		</Border>
+		<Button DockPanel.Dock="Top" IsVisible="{Binding RomFilePath, Converter={x:Static ObjectConverters.IsNull}}" Margin="10" HorizontalAlignment="Stretch" Click="PickRomImage">Pick ROM image to patch</Button>
+		<Button DockPanel.Dock="Bottom" IsEnabled="{Binding RomFilePath, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="10" HorizontalAlignment="Stretch" Click="PatchRom">Patch ROM!</Button>
+		<Border IsVisible="{Binding RomFilePath, Converter={x:Static ObjectConverters.IsNotNull}}" Classes="DropArea" Margin="5,5" Name="SampleSources" CornerRadius="4" BorderThickness="0" DragDrop.AllowDrop="True">
 			<ScrollViewer Padding="10,5">
 				<StackPanel>
 					<ItemsControl ItemsSource="{Binding AvailableSamples}">
 						<ItemsControl.ItemTemplate>
 							<DataTemplate x:DataType="vm:SampleFile">
-								<Panel Margin="0,5">
+								<Panel Margin="0,2">
 									<Patcher:SampleFile DataContext="{Binding}" />
 								</Panel>
 							</DataTemplate>
 						</ItemsControl.ItemTemplate>
 					</ItemsControl>
-					<Button DockPanel.Dock="Bottom" Margin="0,5" HorizontalAlignment="Stretch" Click="PickSource">Add source files</Button>
+					<Button Margin="0,5,0,30" HorizontalAlignment="Center" Click="PickSource">Browse source files...</Button>
 				</StackPanel>
 			</ScrollViewer>
 		</Border>

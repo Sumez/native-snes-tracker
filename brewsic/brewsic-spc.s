@@ -1343,68 +1343,46 @@ UpdateDspChannel:
 				mov a, #$ff
 				mov y, #$1f
 			:
-			movw Temp+0, ya ; Note*64
+			movw Temp+0, ya ; Note*64, meaning every (64*12) 768th increment is an octave.
 			
-			mov	a, !LUT_DIV3+y
+			mov	a, !LUT_DIV3+y ; 768 is 3 times 256, so if we divide the high byte by 3 we get the target octave
 			mov	Temp+2, a ; Octave
 			
 			asl	a
-			adc	a, Temp+2
+			adc	a, Temp+2 ; Multiply by 3 again, shedding any remainder value (TODO: use a LUT for this?)
 			mov	Temp+3, a
 			mov	a, Temp+1
 			setc
-			sbc	a, Temp+3
+			sbc	a, Temp+3 ; Get that remainder value... seriously there must be a better way to do this
+			; A<<8 | Temp+0 is now a spot on the octave (~0-11.984), multiplied by 64 (0-767)
 			
-			asl	Temp+0				; m3 = m3*2 + LUT_FTAB base
-			rol	a				;
-			adc	Temp+0, #(LUT_FTAB&0FFh)		;
-			adc	a, #(LUT_FTAB>>8)			; 
-			mov	Temp+1, a				;
+			; Roll left once because the table is 16bit values (TODO: just split the table into one two tables of high bytes and low bytes)
+			asl	Temp+0
+			rol	a
+			; The LUT is too large to look up using an index register, so just add the address (TODO: just split into three LUTs and use a CMP to branch to the right one. Maybe even don't divide by three, and use a binary-friendly approach from the start?
+			adc	Temp+0, #<LUT_FTAB
+			adc	a, #>LUT_FTAB
+			mov	Temp+1, a ; Now Temp0+1 have a 16 bit address to the target frequency on the highest octave
 			mov	y, #0
-			mov	a, [Temp]+y
-			mov	Temp+4, a				;
-			inc	y				;
-			mov	a, [Temp]+y			;
-			push	a				;
+			mov	a, [Temp+0]+y
+			mov	Temp+4, a
+			inc	y
+			mov	a, [Temp+0]+y
+			push a
 			
-	mov	a, #8				; y = 8-oct
-	setc					;
-	sbc	a, Temp+2				;
-	mov	y, a				;
+	mov	a, #8
+	setc
+	sbc	a, Temp+2
+	mov	y, a ; Y is now 8 minus octave ($8,7,6,5,4,3,2,1,0,FF)
 
-	pop	a				; a,m4 = ftab value
-	beq	@no_pitch_shift			; skip shift if 0
-	
-	lsr	a				; shift by (8-oct)
-	ror	Temp+4				;
-	dec	y				;
-	beq	@no_pitch_shift			;
-	lsr	a				;
-	ror	Temp+4				;
-	dec	y				;
-	beq	@no_pitch_shift			;
-	lsr	a				;
-	ror	Temp+4				;
-	dec	y				;
-	beq	@no_pitch_shift			;
-	lsr	a				;
-	ror	Temp+4				;
-	dec	y				;
-	beq	@no_pitch_shift			;
-	lsr	a				;	
-	ror	Temp+4				;	
-	dec	y				;
-	beq	@no_pitch_shift			;
-	lsr	a				;
-	ror	Temp+4				;
-	dec	y				;
-	beq	@no_pitch_shift			;
-	lsr	a				;
-	ror	Temp+4				;
-	dec	y				;
-	beq	@no_pitch_shift			;
-	lsr	a				;
-	ror	Temp+4				;
+	pop	a				; A<<8 | Temp4 = ftab value
+	beq	@no_pitch_shift			; Z flag is carried from the mov to Y. Skip shift if 0
+	;Half the frequency for every octave step
+	:
+		lsr	a
+		ror	Temp+4				;
+		dec	y				;
+	bne :-
 	
 	@no_pitch_shift:
 	mov	Temp+5, a
@@ -1560,60 +1538,41 @@ LUT_DIV3:
 	.byte 3, 3, 3, 4, 4, 4, 5, 5, 5
 	.byte 6, 6, 6, 7, 7, 7, 8, 8, 8
 	.byte 9, 9, 9,10,10
-	
+
+
 LUT_FTAB:
-        .word 02174h, 0217Bh, 02183h, 0218Bh, 02193h, 0219Ah, 021A2h, 021AAh, 021B2h, 021BAh, 021C1h, 021C9h, 021D1h, 021D9h, 021E1h, 021E8h
-        .word 021F0h, 021F8h, 02200h, 02208h, 02210h, 02218h, 0221Fh, 02227h, 0222Fh, 02237h, 0223Fh, 02247h, 0224Fh, 02257h, 0225Fh, 02267h
-        .word 0226Fh, 02277h, 0227Fh, 02287h, 0228Fh, 02297h, 0229Fh, 022A7h, 022AFh, 022B7h, 022BFh, 022C7h, 022CFh, 022D7h, 022DFh, 022E7h
-        .word 022EFh, 022F7h, 022FFh, 02307h, 0230Fh, 02317h, 0231Fh, 02328h, 02330h, 02338h, 02340h, 02348h, 02350h, 02358h, 02361h, 02369h
-        .word 02371h, 02379h, 02381h, 0238Ah, 02392h, 0239Ah, 023A2h, 023AAh, 023B3h, 023BBh, 023C3h, 023CBh, 023D4h, 023DCh, 023E4h, 023EDh
-        .word 023F5h, 023FDh, 02406h, 0240Eh, 02416h, 0241Fh, 02427h, 0242Fh, 02438h, 02440h, 02448h, 02451h, 02459h, 02462h, 0246Ah, 02472h
-        .word 0247Bh, 02483h, 0248Ch, 02494h, 0249Dh, 024A5h, 024AEh, 024B6h, 024BEh, 024C7h, 024CFh, 024D8h, 024E0h, 024E9h, 024F2h, 024FAh
-        .word 02503h, 0250Bh, 02514h, 0251Ch, 02525h, 0252Dh, 02536h, 0253Fh, 02547h, 02550h, 02559h, 02561h, 0256Ah, 02572h, 0257Bh, 02584h
-        .word 0258Ch, 02595h, 0259Eh, 025A7h, 025AFh, 025B8h, 025C1h, 025C9h, 025D2h, 025DBh, 025E4h, 025ECh, 025F5h, 025FEh, 02607h, 0260Fh
-        .word 02618h, 02621h, 0262Ah, 02633h, 0263Ch, 02644h, 0264Dh, 02656h, 0265Fh, 02668h, 02671h, 0267Ah, 02682h, 0268Bh, 02694h, 0269Dh
-        .word 026A6h, 026AFh, 026B8h, 026C1h, 026CAh, 026D3h, 026DCh, 026E5h, 026EEh, 026F7h, 02700h, 02709h, 02712h, 0271Bh, 02724h, 0272Dh
-        .word 02736h, 0273Fh, 02748h, 02751h, 0275Ah, 02763h, 0276Dh, 02776h, 0277Fh, 02788h, 02791h, 0279Ah, 027A3h, 027ACh, 027B6h, 027BFh
-        .word 027C8h, 027D1h, 027DAh, 027E4h, 027EDh, 027F6h, 027FFh, 02809h, 02812h, 0281Bh, 02824h, 0282Eh, 02837h, 02840h, 0284Ah, 02853h
-        .word 0285Ch, 02865h, 0286Fh, 02878h, 02882h, 0288Bh, 02894h, 0289Eh, 028A7h, 028B0h, 028BAh, 028C3h, 028CDh, 028D6h, 028E0h, 028E9h
-        .word 028F2h, 028FCh, 02905h, 0290Fh, 02918h, 02922h, 0292Bh, 02935h, 0293Eh, 02948h, 02951h, 0295Bh, 02965h, 0296Eh, 02978h, 02981h
-        .word 0298Bh, 02995h, 0299Eh, 029A8h, 029B1h, 029BBh, 029C5h, 029CEh, 029D8h, 029E2h, 029EBh, 029F5h, 029FFh, 02A08h, 02A12h, 02A1Ch
-        .word 02A26h, 02A2Fh, 02A39h, 02A43h, 02A4Dh, 02A56h, 02A60h, 02A6Ah, 02A74h, 02A7Eh, 02A87h, 02A91h, 02A9Bh, 02AA5h, 02AAFh, 02AB9h
-        .word 02AC3h, 02ACCh, 02AD6h, 02AE0h, 02AEAh, 02AF4h, 02AFEh, 02B08h, 02B12h, 02B1Ch, 02B26h, 02B30h, 02B3Ah, 02B44h, 02B4Eh, 02B58h
-        .word 02B62h, 02B6Ch, 02B76h, 02B80h, 02B8Ah, 02B94h, 02B9Eh, 02BA8h, 02BB2h, 02BBCh, 02BC6h, 02BD1h, 02BDBh, 02BE5h, 02BEFh, 02BF9h
-        .word 02C03h, 02C0Dh, 02C18h, 02C22h, 02C2Ch, 02C36h, 02C40h, 02C4Bh, 02C55h, 02C5Fh, 02C69h, 02C74h, 02C7Eh, 02C88h, 02C93h, 02C9Dh
-        .word 02CA7h, 02CB2h, 02CBCh, 02CC6h, 02CD1h, 02CDBh, 02CE5h, 02CF0h, 02CFAh, 02D04h, 02D0Fh, 02D19h, 02D24h, 02D2Eh, 02D39h, 02D43h
-        .word 02D4Dh, 02D58h, 02D62h, 02D6Dh, 02D77h, 02D82h, 02D8Ch, 02D97h, 02DA1h, 02DACh, 02DB7h, 02DC1h, 02DCCh, 02DD6h, 02DE1h, 02DECh
-        .word 02DF6h, 02E01h, 02E0Bh, 02E16h, 02E21h, 02E2Bh, 02E36h, 02E41h, 02E4Bh, 02E56h, 02E61h, 02E6Ch, 02E76h, 02E81h, 02E8Ch, 02E97h
-        .word 02EA1h, 02EACh, 02EB7h, 02EC2h, 02ECCh, 02ED7h, 02EE2h, 02EEDh, 02EF8h, 02F03h, 02F0Eh, 02F18h, 02F23h, 02F2Eh, 02F39h, 02F44h
-        .word 02F4Fh, 02F5Ah, 02F65h, 02F70h, 02F7Bh, 02F86h, 02F91h, 02F9Ch, 02FA7h, 02FB2h, 02FBDh, 02FC8h, 02FD3h, 02FDEh, 02FE9h, 02FF4h
-        .word 02FFFh, 0300Ah, 03015h, 03020h, 0302Ch, 03037h, 03042h, 0304Dh, 03058h, 03063h, 0306Eh, 0307Ah, 03085h, 03090h, 0309Bh, 030A7h
-        .word 030B2h, 030BDh, 030C8h, 030D4h, 030DFh, 030EAh, 030F5h, 03101h, 0310Ch, 03117h, 03123h, 0312Eh, 0313Ah, 03145h, 03150h, 0315Ch
-        .word 03167h, 03173h, 0317Eh, 03189h, 03195h, 031A0h, 031ACh, 031B7h, 031C3h, 031CEh, 031DAh, 031E5h, 031F1h, 031FCh, 03208h, 03213h
-        .word 0321Fh, 0322Bh, 03236h, 03242h, 0324Dh, 03259h, 03265h, 03270h, 0327Ch, 03288h, 03293h, 0329Fh, 032ABh, 032B7h, 032C2h, 032CEh
-        .word 032DAh, 032E5h, 032F1h, 032FDh, 03309h, 03315h, 03320h, 0332Ch, 03338h, 03344h, 03350h, 0335Ch, 03367h, 03373h, 0337Fh, 0338Bh
-        .word 03397h, 033A3h, 033AFh, 033BBh, 033C7h, 033D3h, 033DFh, 033EBh, 033F7h, 03403h, 0340Fh, 0341Bh, 03427h, 03433h, 0343Fh, 0344Bh
-        .word 03457h, 03463h, 0346Fh, 0347Bh, 03488h, 03494h, 034A0h, 034ACh, 034B8h, 034C4h, 034D1h, 034DDh, 034E9h, 034F5h, 03502h, 0350Eh
-        .word 0351Ah, 03526h, 03533h, 0353Fh, 0354Bh, 03558h, 03564h, 03570h, 0357Dh, 03589h, 03595h, 035A2h, 035AEh, 035BAh, 035C7h, 035D3h
-        .word 035E0h, 035ECh, 035F9h, 03605h, 03612h, 0361Eh, 0362Bh, 03637h, 03644h, 03650h, 0365Dh, 03669h, 03676h, 03683h, 0368Fh, 0369Ch
-        .word 036A8h, 036B5h, 036C2h, 036CEh, 036DBh, 036E8h, 036F4h, 03701h, 0370Eh, 0371Bh, 03727h, 03734h, 03741h, 0374Eh, 0375Ah, 03767h
-        .word 03774h, 03781h, 0378Eh, 0379Ah, 037A7h, 037B4h, 037C1h, 037CEh, 037DBh, 037E8h, 037F5h, 03802h, 0380Eh, 0381Bh, 03828h, 03835h
-        .word 03842h, 0384Fh, 0385Ch, 03869h, 03876h, 03884h, 03891h, 0389Eh, 038ABh, 038B8h, 038C5h, 038D2h, 038DFh, 038ECh, 038FAh, 03907h
-        .word 03914h, 03921h, 0392Eh, 0393Bh, 03949h, 03956h, 03963h, 03970h, 0397Eh, 0398Bh, 03998h, 039A6h, 039B3h, 039C0h, 039CEh, 039DBh
-        .word 039E8h, 039F6h, 03A03h, 03A11h, 03A1Eh, 03A2Bh, 03A39h, 03A46h, 03A54h, 03A61h, 03A6Fh, 03A7Ch, 03A8Ah, 03A97h, 03AA5h, 03AB2h
-        .word 03AC0h, 03ACEh, 03ADBh, 03AE9h, 03AF6h, 03B04h, 03B12h, 03B1Fh, 03B2Dh, 03B3Bh, 03B48h, 03B56h, 03B64h, 03B72h, 03B7Fh, 03B8Dh
-        .word 03B9Bh, 03BA9h, 03BB6h, 03BC4h, 03BD2h, 03BE0h, 03BEEh, 03BFCh, 03C09h, 03C17h, 03C25h, 03C33h, 03C41h, 03C4Fh, 03C5Dh, 03C6Bh
-        .word 03C79h, 03C87h, 03C95h, 03CA3h, 03CB1h, 03CBFh, 03CCDh, 03CDBh, 03CE9h, 03CF7h, 03D05h, 03D13h, 03D21h, 03D2Fh, 03D3Eh, 03D4Ch
-        .word 03D5Ah, 03D68h, 03D76h, 03D85h, 03D93h, 03DA1h, 03DAFh, 03DBDh, 03DCCh, 03DDAh, 03DE8h, 03DF7h, 03E05h, 03E13h, 03E22h, 03E30h
-        .word 03E3Eh, 03E4Dh, 03E5Bh, 03E6Ah, 03E78h, 03E86h, 03E95h, 03EA3h, 03EB2h, 03EC0h, 03ECFh, 03EDDh, 03EECh, 03EFAh, 03F09h, 03F18h
-        .word 03F26h, 03F35h, 03F43h, 03F52h, 03F61h, 03F6Fh, 03F7Eh, 03F8Dh, 03F9Bh, 03FAAh, 03FB9h, 03FC7h, 03FD6h, 03FE5h, 03FF4h, 04002h
-        .word 04011h, 04020h, 0402Fh, 0403Eh, 0404Dh, 0405Bh, 0406Ah, 04079h, 04088h, 04097h, 040A6h, 040B5h, 040C4h, 040D3h, 040E2h, 040F1h
-        .word 04100h, 0410Fh, 0411Eh, 0412Dh, 0413Ch, 0414Bh, 0415Ah, 04169h, 04178h, 04188h, 04197h, 041A6h, 041B5h, 041C4h, 041D3h, 041E3h
-        .word 041F2h, 04201h, 04210h, 04220h, 0422Fh, 0423Eh, 0424Eh, 0425Dh, 0426Ch, 0427Ch, 0428Bh, 0429Ah, 042AAh, 042B9h, 042C9h, 042D8h
+Octave8:
+; Octave randing from $2000 to $4000 pitch (the highest a SNES can play correctly)
+; JS to generate data:
+; const notes = []; for (let i = 0; i < 768; i++) notes.push(Math.round(0x2000 * Math.pow(Math.pow(2, 1/768),i))); console.log(notes.map(n => `$${n.toString(16)}`).join(','));
+.word $2000,$2007,$200f,$2016,$201e,$2025,$202c,$2034,$203b,$2043,$204a,$2052,$2059,$2061,$2068,$2070,$2077,$207f,$2086,$208e,$2095,$209d,$20a4,$20ac,$20b3,$20bb,$20c3,$20ca,$20d2,$20d9,$20e1,$20e8,$20f0,$20f8,$20ff,$2107,$210f,$2116,$211e,$2125,$212d,$2135,$213c,$2144,$214c,$2154,$215b,$2163,$216b,$2172,$217a,$2182,$218a,$2191,$2199,$21a1,$21a9,$21b0,$21b8,$21c0,$21c8,$21d0,$21d7,$21df,$21e7,$21ef,$21f7,$21ff,$2207,$220e,$2216,$221e,$2226,$222e,$2236,$223e,$2246,$224e,$2255,$225d,$2265,$226d,$2275,$227d,$2285,$228d,$2295,$229d,$22a5,$22ad,$22b5,$22bd,$22c5,$22cd,$22d5,$22dd,$22e5,$22ee,$22f6,$22fe,$2306,$230e,$2316,$231e,$2326,$232e,$2336,$233f,$2347,$234f,$2357,$235f,$2367,$2370,$2378,$2380,$2388,$2390,$2399,$23a1,$23a9,$23b1,$23ba,$23c2,$23ca,$23d2,$23db,$23e3,$23eb,$23f4,$23fc,$2404,$240c,$2415,$241d,$2425,$242e,$2436,$243f,$2447,$244f,$2458,$2460,$2469,$2471,$2479,$2482,$248a,$2493,$249b,$24a4,$24ac,$24b5,$24bd,$24c6,$24ce,$24d7,$24df,$24e8,$24f0,$24f9,$2501,$250a,$2512,$251b,$2523,$252c,$2535,$253d,$2546,$254e,$2557,$2560,$2568,$2571,$257a,$2582,$258b,$2594,$259c,$25a5,$25ae,$25b6,$25bf,$25c8,$25d1,$25d9,$25e2,$25eb,$25f4,$25fc,$2605,$260e,$2617,$2620,$2628,$2631,$263a,$2643,$264c,$2655,$265d,$2666,$266f,$2678,$2681,$268a,$2693,$269c,$26a5,$26ae,$26b6,$26bf,$26c8,$26d1,$26da,$26e3,$26ec,$26f5,$26fe,$2707,$2710,$2719,$2722,$272b,$2735,$273e,$2747,$2750,$2759,$2762,$276b,$2774,$277d,$2786,$278f,$2799,$27a2,$27ab,$27b4,$27bd,$27c6,$27d0,$27d9,$27e2,$27eb,$27f5,$27fe,$2807,$2810,$281a,$2823,$282c,$2835,$283f,$2848,$2851,$285b,$2864,$286d,$2877,$2880,$2889,$2893,$289c,$28a5,$28af,$28b8,$28c2,$28cb,$28d5,$28de,$28e7,$28f1,$28fa,$2904,$290d,$2917,$2920,$292a,$2933,$293d,$2946,$2950,$2959,$2963,$296d,$2976,$2980,$2989,$2993,$299d,$29a6,$29b0,$29b9,$29c3,$29cd,$29d6,$29e0,$29ea,$29f3,$29fd,$2a07,$2a11,$2a1a,$2a24,$2a2e,$2a37,$2a41,$2a4b,$2a55,$2a5f,$2a68,$2a72,$2a7c,$2a86,$2a90,$2a99,$2aa3,$2aad,$2ab7,$2ac1,$2acb,$2ad5,$2adf,$2ae8,$2af2,$2afc,$2b06,$2b10,$2b1a,$2b24,$2b2e,$2b38,$2b42,$2b4c,$2b56,$2b60,$2b6a,$2b74,$2b7e,$2b88,$2b92,$2b9c,$2ba6,$2bb1,$2bbb,$2bc5,$2bcf,$2bd9,$2be3,$2bed,$2bf7,$2c02,$2c0c,$2c16,$2c20,$2c2a,$2c35,$2c3f,$2c49,$2c53,$2c5d,$2c68,$2c72,$2c7c,$2c87,$2c91,$2c9b,$2ca5,$2cb0,$2cba,$2cc4,$2ccf,$2cd9,$2ce4,$2cee,$2cf8,$2d03,$2d0d,$2d17,$2d22,$2d2c,$2d37,$2d41,$2d4c,$2d56,$2d61,$2d6b,$2d76,$2d80,$2d8b,$2d95,$2da0,$2daa,$2db5,$2dbf,$2dca,$2dd5,$2ddf,$2dea,$2df4,$2dff,$2e0a,$2e14,$2e1f,$2e2a,$2e34,$2e3f,$2e4a,$2e54,$2e5f,$2e6a,$2e74,$2e7f,$2e8a,$2e95,$2e9f,$2eaa,$2eb5,$2ec0,$2ecb,$2ed5,$2ee0,$2eeb,$2ef6,$2f01,$2f0c,$2f17,$2f21,$2f2c,$2f37,$2f42,$2f4d,$2f58,$2f63,$2f6e,$2f79,$2f84,$2f8f,$2f9a,$2fa5,$2fb0,$2fbb,$2fc6,$2fd1,$2fdc,$2fe7,$2ff2,$2ffd,$3008,$3013,$301f,$302a,$3035,$3040,$304b,$3056,$3061,$306d,$3078,$3083,$308e,$3099,$30a5,$30b0,$30bb,$30c6,$30d2,$30dd,$30e8,$30f4,$30ff,$310a,$3116,$3121,$312c,$3138,$3143,$314e,$315a,$3165,$3171,$317c,$3187,$3193,$319e,$31aa,$31b5,$31c1,$31cc,$31d8,$31e3,$31ef,$31fa,$3206,$3212,$321d,$3229,$3234,$3240,$324c,$3257,$3263,$326e,$327a,$3286,$3291,$329d,$32a9,$32b5,$32c0,$32cc,$32d8,$32e3,$32ef,$32fb,$3307,$3313,$331e,$332a,$3336,$3342,$334e,$335a,$3365,$3371,$337d,$3389,$3395,$33a1,$33ad,$33b9,$33c5,$33d1,$33dd,$33e9,$33f5,$3401,$340d,$3419,$3425,$3431,$343d,$3449,$3455,$3461,$346d,$3479,$3486,$3492,$349e,$34aa,$34b6,$34c2,$34cf,$34db,$34e7,$34f3,$34ff,$350c,$3518,$3524,$3531,$353d,$3549,$3555,$3562,$356e,$357a,$3587,$3593,$35a0,$35ac,$35b8,$35c5,$35d1,$35de,$35ea,$35f7,$3603,$3610,$361c,$3629,$3635,$3642,$364e,$365b,$3667,$3674,$3680,$368d,$369a,$36a6,$36b3,$36c0,$36cc,$36d9,$36e6,$36f2,$36ff,$370c,$3718,$3725,$3732,$373f,$374b,$3758,$3765,$3772,$377f,$378b,$3798,$37a5,$37b2,$37bf,$37cc,$37d9,$37e6,$37f2,$37ff,$380c,$3819,$3826,$3833,$3840,$384d,$385a,$3867,$3874,$3881,$388e,$389b,$38a9,$38b6,$38c3,$38d0,$38dd,$38ea,$38f7,$3904,$3912,$391f,$392c,$3939,$3947,$3954,$3961,$396e,$397c,$3989,$3996,$39a3,$39b1,$39be,$39cb,$39d9,$39e6,$39f4,$3a01,$3a0e,$3a1c,$3a29,$3a37,$3a44,$3a52,$3a5f,$3a6d,$3a7a,$3a88,$3a95,$3aa3,$3ab0,$3abe,$3acb,$3ad9,$3ae7,$3af4,$3b02,$3b0f,$3b1d,$3b2b,$3b38,$3b46,$3b54,$3b62,$3b6f,$3b7d,$3b8b,$3b98,$3ba6,$3bb4,$3bc2,$3bd0,$3bdd,$3beb,$3bf9,$3c07,$3c15,$3c23,$3c31,$3c3f,$3c4d,$3c5a,$3c68,$3c76,$3c84,$3c92,$3ca0,$3cae,$3cbc,$3cca,$3cd8,$3ce7,$3cf5,$3d03,$3d11,$3d1f,$3d2d,$3d3b,$3d49,$3d58,$3d66,$3d74,$3d82,$3d90,$3d9f,$3dad,$3dbb,$3dc9,$3dd8,$3de6,$3df4,$3e03,$3e11,$3e1f,$3e2e,$3e3c,$3e4a,$3e59,$3e67,$3e76,$3e84,$3e92,$3ea1,$3eaf,$3ebe,$3ecc,$3edb,$3ee9,$3ef8,$3f07,$3f15,$3f24,$3f32,$3f41,$3f50,$3f5e,$3f6d,$3f7b,$3f8a,$3f99,$3fa8,$3fb6,$3fc5,$3fd4,$3fe2,$3ff1
 
 DspChannels:
 	.byte $00,$10,$20,$30,$40,$50,$60,$70
 
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+nop
 .align $100
 .assert * = SampleDirectoryAddress, error, "Unaligned track data - Update directory address in both SPC and CPU code. Compiled track images will also not work anymore"
 

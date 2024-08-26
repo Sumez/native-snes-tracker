@@ -4,6 +4,7 @@
 .local BrrStart, BrrEnd
 	.byte name,$ff
 	.word .loword(BrrEnd-BrrStart-2)
+	.word $0000
 	BrrStart: .incbin source
 	BrrEnd:
 .endmacro
@@ -11,6 +12,7 @@
 .local BrrStart, BrrEnd
 	.byte name,$ff
 	.word .loword(BrrEnd-BrrStart)
+	.word $0000
 	.word $0000
 	BrrStart: 
 		.incbin source

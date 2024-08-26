@@ -1,8 +1,8 @@
 .global PatternNotes,PatternInstruments
 .define GAME_TITLE "SuperTrax94"
 
-.define TilemapBufferSegment "BSS7F"
-.define CompiledPlaybackDataSegment "BSS7E"
+.define TilemapBufferSegment "BSS7E"
+.define CompiledPlaybackDataSegment "BSS7F"
 
 ; Memory addresses
 .global SONG, CHAINS, PHRASES_1, PHRASES_2, INSTRUMENTS, SAMPLES

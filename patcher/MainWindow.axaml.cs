@@ -8,11 +8,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace Patcher;
 public partial class MainWindow : Window
 {
+	public static int PatchedSamplesStartAddress = 0x081900; // Get this dynamically by reading from another address in file
 	public Patch Patch { get; set; }
 	public PreviewPlayer PreviewPlayer { get; set; }
 
@@ -23,20 +25,52 @@ public partial class MainWindow : Window
 		PreviewPlayer = new PreviewPlayer();
 		PreviewPlayer.PlaySilence();
 
-		//AddBrrfile(File.OpenRead("../../../../samples/perc_snare.brr"), "perc_snare");
+		AddBrrfile(File.OpenRead("../../../../samples/perc_snare.brr"), "perc_snare");
+//		Patch.RomFilePath = "23";
 		AddUncompressedAudio("../../../../samples/perc_snare.wav", "perc_snare");
 
 		DragDrop.AllowDropProperty.OverrideDefaultValue<MainWindow>(true);
 
-		AddHandler(DragDrop.DropEvent, Drop);
+		SampleSources.AddHandler(DragDrop.DropEvent, SampleDrop);
 		AddHandler(DragDrop.DragOverEvent, DragOver);
-		AddHandler(DragDrop.DragEnterEvent, DragEnter);
-		AddHandler(DragDrop.DragLeaveEvent, DragLeave);
+		SampleSources.AddHandler(DragDrop.DragEnterEvent, (s, e) => SampleSources.Classes.Set("DragOver", true));
+		SampleSources.AddHandler(DragDrop.DragLeaveEvent, (s, e) => SampleSources.Classes.Set("DragOver", false));
+		AddHandler(DragDrop.DropEvent, RomDrop);
 	}
 
 	private void DragEnter(object? sender, DragEventArgs e) { e.DragEffects = DragDropEffects.Link; }
-	private void DragLeave(object? sender, DragEventArgs e) { }
+	private void DragLeave(object? sender, DragEventArgs e) => SampleSources.Classes.Set("dragover", false);
+	private void DragOver(object? sender, DragEventArgs e)
+	{
+		var files = e.Data.GetFiles()?.OfType<IStorageFile>();
+		if (Patch.RomFilePath == null)
+		{
+			if (files == null || files.Count() != 1 || Path.GetExtension(files.First().Name).ToLower() != ".sfc")
+			{
+				e.DragEffects = DragDropEffects.None;
+			}
+			return;
+		}
 
+		if (e.Source != SampleSources) return;
+		SampleSources.Classes.Set("dragover", true);
+		if (files == null || !files.Any(f => ValidSampleFiles.Contains(Path.GetExtension(f.Name).ToLower())))
+		{
+			e.DragEffects = DragDropEffects.None;
+		}
+	}
+	private async void RomDrop(object? sender, DragEventArgs e)
+	{
+		if (Patch.RomFilePath != null) return;
+		var files = e.Data.GetFiles()?.OfType<IStorageFile>();
+		if (files == null || files.Count() != 1 || Path.GetExtension(files.First().Name).ToLower() != ".sfc") return;
+		await UseRomFile(files.First());
+	}
+	private void SampleDrop(object? sender, DragEventArgs e)
+	{
+		var files = e.Data.GetFiles()?.OfType<IStorageFile>();
+		if (files != null && files.Any(f => ValidSampleFiles.Contains(Path.GetExtension(f.Name).ToLower()))) AddSampleFiles(files);
+	}
 	public async void PickRomImage(object? sender, RoutedEventArgs args)
 	{
 		var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -46,15 +80,85 @@ public partial class MainWindow : Window
 			FileTypeFilter = new[] { new FilePickerFileType("Super Chrono Tracker BSDJ '94") { Patterns = new[] { "bsdj.sfc" } } }
 		});
 
-		if (files.Count >= 1)
-		{
-			// Open reading stream from the first file.
-			await using var stream = await files[0].OpenReadAsync();
-			using var streamReader = new StreamReader(stream);
-			// Reads all the content of file as a text.
-			var fileContent = await streamReader.ReadToEndAsync();
-		}
+		if (files.Count < 1) return;
+		await UseRomFile(files[0]);
 	}
+	public async void PatchRom(object? sender, RoutedEventArgs args)
+	{
+		if (Patch.RomFilePath == null) return;
+
+		var selectedSamples = Patch.AvailableSamples.Where(s => s.Selected && s.BrrSample != null);
+
+		var duplicateSampleNames = selectedSamples.GroupBy(s => s.Name).Where(g => g.Count() > 1);
+		if (duplicateSampleNames.Any())
+		{
+			var message = new StringBuilder("Error: The following sample names are duplicated:\n");
+			foreach (var group in duplicateSampleNames) message.Append(group.Key).Append('\n');
+			message.Append("\nPlease rename or remove duplicates.");
+			await new MessageBox(message.ToString()).ShowDialog(this);
+			return;
+		}
+
+		using var writer = new BinaryWriter(new MemoryStream());
+		foreach (var sample in selectedSamples)
+		{
+			if (sample.BrrSample == null) continue;
+
+			writer.Write(CharMap.FromString(sample.Name));
+			writer.Write((byte)0xFF);
+			writer.Write((Int16)sample.BrrSample.SampleData.Length);
+			writer.Write((Int16)sample.PitchAdjust);
+			writer.Write((Int16)sample.BrrSample.LoopStart);
+			writer.Write(sample.BrrSample!.SampleData);
+		}
+		// Write empty sample at the end to indicate end of data
+		writer.Write((byte)0xFF);
+		writer.Write((Int16)0);
+
+		using var stream = File.OpenWrite(Patch.RomFilePath);
+		if (stream.Length < PatchedSamplesStartAddress + writer.BaseStream.Length)
+		{
+			await new MessageBox("Error: ROM file is too small to contain all selected samples.").ShowDialog(this);
+			return;
+		}
+		stream.Position = PatchedSamplesStartAddress;
+		writer.BaseStream.Position = 0;
+		writer.BaseStream.CopyTo(stream);
+
+		await new MessageBox("ROM patched successfully!").ShowDialog(this);
+	}
+	private async Task UseRomFile(IStorageFile file)
+	{
+		Patch.RomFilePath = file.Path.LocalPath;
+		await using var stream = await file.OpenReadAsync();
+		stream.Position = PatchedSamplesStartAddress;
+		SampleFile? extractedSample;
+		do
+		{
+			extractedSample = GetSampleFromTracker(stream);
+			if (extractedSample != null) Patch.AvailableSamples.Add(extractedSample);
+		} while (extractedSample != null);
+	}
+
+	private SampleFile? GetSampleFromTracker(Stream stream)
+	{
+		var name = new StringBuilder();
+		var nextByte = stream.ReadByte();
+		while (nextByte != 0xFF) { 
+			name.Append(CharMap.FromByte(nextByte));
+			nextByte = stream.ReadByte();
+		}
+
+		var size = stream.ReadByte() | (stream.ReadByte() << 8);
+		if (size == 0) return null;
+		var pitchAdjust = stream.ReadByte() | (stream.ReadByte() << 8);
+		var loopOffset = stream.ReadByte() | (stream.ReadByte() << 8);
+		var sampleData = new byte[size];
+		stream.Read(sampleData, 0, size);
+		var brrSample = new Brewsic.BrrSample(sampleData, loopOffset);
+		return new SampleFile(name.ToString(), brrSample) { Expanded = false, PitchAdjust = pitchAdjust };
+	}
+
 	public async void PickSource(object? sender, RoutedEventArgs args)
 	{
 		var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
@@ -67,21 +171,6 @@ public partial class MainWindow : Window
 	}
 
 	private static string[] ValidSampleFiles = new[] { ".brr", ".wav", ".mp3", ".spc", ".sfc", ".smc" };
-
-	private void DragOver(object? sender, DragEventArgs e)
-	{
-		if (e.Source != SampleSources) return;
-		var files = e.Data.GetFiles()?.OfType<IStorageFile>();
-		if (files == null || !files.Any(f => ValidSampleFiles.Contains(Path.GetExtension(f.Name).ToLower())))
-        {
-			e.DragEffects = DragDropEffects.None;
-        }
-	}
-	private void Drop(object? sender, DragEventArgs e)
-	{
-		var files = e.Data.GetFiles()?.OfType<IStorageFile>();
-		if (files != null && files.Any(f => ValidSampleFiles.Contains(Path.GetExtension(f.Name).ToLower()))) AddSampleFiles(files);
-	}
 
 	private async Task AddSampleFiles(IEnumerable<IStorageFile> files)
 	{
@@ -143,12 +232,17 @@ public partial class MainWindow : Window
 
 				if (loopStart < 0 || loopStart > sampleSize || (loopStart % 9) != 0) loopStart = 0;
 				var sample = new Brewsic.BrrSample(brrSampleData, loopStart);
-				dialog.AddSampleFile(new SampleFile($"{name} {counter++.ToString().PadLeft(2, '0')}", sample));
+				dialog.AddSampleFile(new SampleFile($"{name} {counter++.ToString().PadLeft(2, '0')}", sample) { Selected = false });
 			}
 			directoryAddress += 4;
 		}
-
+		if (counter == 0)
+		{
+			await new MessageBox("Didn't detect any BRR samples in source file - sorry :(").ShowDialog(dialog);
+			dialog.Close();
+		}
 		await dialogTask;
+		foreach (var sample in dialog.SamplesToAddToPatch) Patch.AvailableSamples.Add(sample);
 	}
 
 	private async Task AddBrrfile(Stream stream, string name)
@@ -191,18 +285,17 @@ public partial class MainWindow : Window
 					await stream.ReadAsync(brrSampleData, 0, sampleSize);
 					var sample = new Brewsic.BrrSample(brrSampleData);
 
-					dialog.AddSampleFile(new SampleFile($"{name} {counter++.ToString().PadLeft(2, '0')}", sample));
+					dialog.AddSampleFile(new SampleFile($"{name} {counter++.ToString().PadLeft(2, '0')}", sample) { Selected = false });
 				}
 			}
 		}
-		/*if (newSampleFiles.Count == 0)
+		if (counter == 0)
 		{
-			await ShowDialog(new MessageBox("Didn't detect any BRR samples in source file - sorry :("));
-			// TODO: show error message
-			return;
-		}*/
-
+			await new MessageBox("Didn't detect any BRR samples in source file - sorry :(").ShowDialog(dialog);
+			dialog.Close();
+		}
 		await dialogTask;
+		foreach (var sample in dialog.SamplesToAddToPatch) Patch.AvailableSamples.Add(sample);
 	}
 
 	private async Task<int> DetectSampleData(Stream stream, bool checkForSilentFirstSample = false, bool checkForLikelyBlockHeaders = false)

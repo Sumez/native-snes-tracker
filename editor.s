@@ -68,7 +68,9 @@ PreviousScreen: .res 1
 ResetStack: .res 2
 
 .segment CompiledPlaybackDataSegment
-CompiledPattern: .res $8000
+CompiledPattern:
+.res $8000
+.res $8000
 
 
 .segment "CODE7"

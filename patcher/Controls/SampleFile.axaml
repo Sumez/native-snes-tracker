@@ -1,12 +1,20 @@
 <UserControl xmlns="https://github.com/avaloniaui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+						 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+						 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+						 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 						 xmlns:vm="clr-namespace:Patcher.ViewModels"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+						 mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
 						 x:DataType="vm:SampleFile"
-             x:Class="Patcher.Controls.SampleFile">
+						 x:Class="Patcher.Controls.SampleFile">
 	<UserControl.Styles>
+		<Style Selector="ComboBox TextBox">
+			<Setter Property="Height" Value="5" />
+			<Setter Property="Padding" Value="0" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Style Selector="^:focus /template/ Border#PART_BorderElement">
+				<Setter Property="BorderThickness" Value="0" />
+			</Style>
+		</Style>
 		<Style Selector="TextBox,AutoCompleteBox">
 			<Style Selector="^.invalid">
 				<Setter Property="Foreground" Value="Red"/>
@@ -19,42 +27,102 @@
 				<Setter Property="BorderThickness" Value="0" />
 			</Style>
 		</Style>
+		<Style Selector="Border,Button,TextBox,TextBlock,AutoCompleteBox">
+			<Setter Property="ToolTip.ShowDelay" Value="100" />
+		</Style>
+		<Style Selector="Border.SampleBg">
+			<Setter Property="Padding" Value="5" />
+			<Setter Property="Background" Value="LightSteelBlue" />
+			<Setter Property="CornerRadius" Value="2" />
+			<Setter Property="BorderThickness" Value="0" />
+			<Style Selector="^:pointerover">
+				<Setter Property="Opacity" Value="0.9" />
+			</Style>
+			<Style Selector="^ TextBlock">
+				<Setter Property="Foreground" Value="MidnightBlue" />
+			</Style>
+			<Style Selector="^ Button">
+				<Setter Property="Background" Value="SteelBlue" />
+			</Style>
+		</Style>
 	</UserControl.Styles>
-	<Border Height="50" Background="LightGray" CornerRadius="2" BorderThickness="1" Padding="5">
-		<DockPanel>
-			<StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="5">
+	<DockPanel>
+		<CheckBox DockPanel.Dock="Left" IsChecked="{Binding Selected}"></CheckBox>
+		
+		<Border Classes="SampleBg" IsVisible="{Binding Collapsed}" PointerReleased="Expand" Height="25">
+			<Border.Styles><Style Selector="Border"><Setter Property="Cursor" Value="Hand" /></Style></Border.Styles>
+			<DockPanel HorizontalAlignment="Stretch">
 				<Button
-					Name="OriginalPlayButton"
-					ToolTip.Tip="Play original" ToolTip.ShowDelay="100"
-					IsVisible="{Binding UncompressedSourceFile, Converter={x:Static ObjectConverters.IsNotNull}}"
-					Click="PlayUncompressed">
-					<Polygon Points="2,2 8,8 2,15 2,2" Margin="2,0" Fill="CornflowerBlue" />
-				</Button>
-				<Button
-					Name="CompressedPlayButton"
-					ToolTip.Tip="Preview compressed sample" ToolTip.ShowDelay="100"
+					Padding="5,1"
+					DockPanel.Dock="Right"
+					ToolTip.Tip="Preview compressed sample"
 					IsEnabled="{Binding BrrSample, Converter={x:Static ObjectConverters.IsNotNull}}"
-					Click="Play"
-					VerticalAlignment="Stretch">
-					<Polygon Points="3,3 13,13 3,23 3,3" Margin="2,0" Fill="Black" />
+					Click="Play">
+					<Polygon Points="1,1 4,4 1,8 1,1" Margin="0" Fill="MidnightBlue" />
 				</Button>
-			</StackPanel>
-			<StackPanel Spacing="5">
+				<TextBlock Name="NameDisplay" FontSize="11" FontWeight="Bold" Margin="0,0,15,0" Text="{Binding Name}" />
+			</DockPanel>
+		</Border>
+		
+		
+		<Border Classes="SampleBg" IsVisible="{Binding Expanded}" PointerReleased="Collapse" Height="50">
+			<DockPanel>
+				<StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="5">
+					<Button
+						Name="OriginalPlayButton"
+						ToolTip.Tip="Play original"
+						IsVisible="{Binding UncompressedSourceFile, Converter={x:Static ObjectConverters.IsNotNull}}"
+						Click="PlayUncompressed">
+						<Polygon Points="2,2 8,8 2,15 2,2" Margin="2,0" Fill="LightSteelBlue" />
+					</Button>
+					<StackPanel VerticalAlignment="Center">
+						<Button ToolTip.Tip="Preview higher pitch" Click="PlayPitchUp">
+							<Polygon Points="0,3 3,0 6,3 0,3" Margin="0,0" Fill="MidnightBlue" />
+						</Button>
+						<Button ToolTip.Tip="Preview lower pitch" Click="PlayPitchDown">
+							<Polygon Points="0,0 3,3 6,0 0,0" Margin="0,0" Fill="MidnightBlue" />
+						</Button>
+					</StackPanel>
+					<Button
+						ToolTip.Tip="Preview compressed sample"
+						IsEnabled="{Binding BrrSample, Converter={x:Static ObjectConverters.IsNotNull}}"
+						Click="Play"
+						VerticalAlignment="Stretch">
+						<Polygon Points="3,3 13,13 3,23 3,3" Margin="2,0" Fill="MidnightBlue" />
+					</Button>
+				</StackPanel>
+
+				<ComboBox Name="NoteInput" IsVisible="false" BorderThickness="0" CornerRadius="2" Margin="120,0,0,0" SelectedIndex="{Binding AssignedNote}" />
+				
+				<TextBox Name="NameInput" IsVisible="false" MinWidth="200" Text="" />
+				
+				<StackPanel Name="SampleInfo" IsVisible="true" Spacing="5">
 				<StackPanel Orientation="Horizontal">
-					<TextBlock FontWeight="Bold" Text="{Binding Name}"/>
+					<Border ToolTip.Tip="Click to change name" Background="LightSteelBlue" MinWidth="150" PointerReleased="EditName" Opacity="0.9">
+						<Border.Styles><Style Selector="Border"><Setter Property="Cursor" Value="Hand" /></Style></Border.Styles>
+						<TextBlock FontWeight="Bold" Text="{Binding Name}" />
+					</Border>
+					<TextBlock Name="AssignedNote" Background="White" FontWeight="Bold"
+											ToolTip.Tip="Note/Octave assigned to original sample pitch, used to tune instruments. Click to change assignment"
+											IsVisible="{Binding UncompressedSourceFile, Converter={x:Static ObjectConverters.IsNotNull}}">
+						<TextBlock.Styles><Style Selector="TextBlock"><Setter Property="Cursor" Value="Hand" /></Style></TextBlock.Styles>
+					</TextBlock>
 				</StackPanel>
 				<StackPanel Orientation="Horizontal" Spacing="3">
-					<TextBlock Text="{Binding CompressedSize}" MinWidth="100"/>
+					<TextBlock Text="{Binding CompressedSize}" ToolTip.Tip="Size of sample after BRR compression" MinWidth="100"/>
 					<AutoCompleteBox
+						ToolTip.Tip="144kbps results in a 32khz sample at the Note/Octave chosen above. This is the highest quality a SNES can play back. More bassy samples intended for low frequency playback can be compressed more with little drop in quality, so a lower bitrate for those is recommended to save space. Try different values and test what works for you."
 						Name="Bitrate"
 						FilterMode="ContainsOrdinal"
 						Text="{Binding CompressionBitRate}"
 						Height="18" Width="40" Padding="15,7,2,0"
-						IsVisible="{Binding UncompressedSourceFile, Converter={x:Static ObjectConverters.IsNotNull}}">
-					</AutoCompleteBox>
-					<TextBlock Text="kbps"/>
+						IsVisible="{Binding UncompressedSourceFile, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+					<TextBlock
+						Text="kbps"
+						IsVisible="{Binding UncompressedSourceFile, Converter={x:Static ObjectConverters.IsNotNull}}"/>
 				</StackPanel>
 			</StackPanel>
-		</DockPanel>
-	</Border>
+			</DockPanel>
+		</Border>
+	</DockPanel>
 </UserControl>

@@ -681,7 +681,7 @@ ChangeCurrentNote:
 	clc
 	adc PatternNotes,x
 	bmi :+
-	cmp #12*10
+	cmp #12*9
 	bcs :+
 		sta PatternNotes,x
 		jsr NoteWasChanged

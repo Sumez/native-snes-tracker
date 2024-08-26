@@ -10,6 +10,8 @@ Name: .byte "Samples",$ff
 
 .segment "BSS7E"
 	
+	; Code-friendly reference to sample ROM data
+	; 6 bytes: PPPxSS, PPP is a 24bit pointer to sample start, SS is ~size in kilobytes
 	SampleDirectory: .res 6*1000+3
 
 .segment "ZEROPAGE"
@@ -19,7 +21,7 @@ Name: .byte "Samples",$ff
 .segment "BSS"
 
 	CursorRow: .res 2
-	AddedSamples: .res (2*64)+2 ; Indexes into SampleDirectory
+	AddedSamples: .res (2*64)+2 ; Ordered list of 16bit indexes into SampleDirectory
 	NumberOfSamples: .res 2 ; That's a lotta samples :O :O :O
 	SamplesUpdated: .res 2
 	TotalSampleDataSizeInSpc: .res 2
@@ -120,7 +122,7 @@ LoadSamples:
 		; Get pointer for next sample
 		pla
 		clc
-		adc #4 ; Add the 2 bytes for sample size, and 2 for loop offset
+		adc #6 ; Add the 2 bytes for sample size, 2 for pitch adjust, and 2 for loop offset
 		adc @titleLength ; don't expect any carry at this point if max sample size is well below $10000
 		adc @samplePointer
 		sta @samplePointer
@@ -546,6 +548,8 @@ CopySamplesToSpcBuffer:
 		seta16
 		lda [@CurrentSamplePointer],Y
 		iny
+		iny
+		iny ; INY twice more to skip pitch adjust value. Only need that for instruments
 		iny
 		sta @SampleSizeCounter
 

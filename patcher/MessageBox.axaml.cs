@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using System;
 
 namespace Patcher;
 
@@ -9,8 +11,8 @@ public partial class MessageBox : Window
     public MessageBox(string message)
     {
         InitializeComponent();
-		Message = message;
+		Message.Text = message;
 	}
 
-	public string Message { get; }
+	private void CloseWindow(object? sender, RoutedEventArgs e) => Close();
 }
