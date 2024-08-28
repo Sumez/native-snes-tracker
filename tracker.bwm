@@ -9,7 +9,7 @@
       <Filename>bin/bsdj.sfc</Filename>
       <BuildPath>bin/obj</BuildPath>
       <DebugFile>bin/bsdj.dbg</DebugFile>
-      <LinkerConfigFile>hirom.cfg</LinkerConfigFile>
+      <LinkerConfigFile>config/hirom.cfg</LinkerConfigFile>
       <MapFile>bin/bsdj.map.txt</MapFile>
       <Symbol>jTESTPATTERN=4</Symbol>
       <Symbol>fTESTCHANNEL=0</Symbol>
@@ -26,7 +26,7 @@
       <Filename>bin/lorom.sfc</Filename>
       <BuildPath>bin/obj</BuildPath>
       <DebugFile>bin/lorom.dbg</DebugFile>
-      <LinkerConfigFile>snes.cfg</LinkerConfigFile>
+      <LinkerConfigFile>config/snes.cfg</LinkerConfigFile>
       <MapFile>bin/lorom.map.txt</MapFile>
       <Symbol>FASTTRANSFER</Symbol>
       <CalculateChecksum>true</CalculateChecksum>
@@ -66,7 +66,7 @@
   </File>
   <File>
     <Id>6</Id>
-    <RelativePath>snes.cfg</RelativePath>
+    <RelativePath>config/snes.cfg</RelativePath>
     <Mode>LinkerConfig</Mode>
   </File>
   <File>
@@ -96,7 +96,7 @@
   </File>
   <File>
     <Id>12</Id>
-    <RelativePath>spc.cfg</RelativePath>
+    <RelativePath>config/spc.cfg</RelativePath>
     <Mode>LinkerConfig</Mode>
   </File>
   <File>
@@ -129,7 +129,7 @@
   </File>
   <File>
     <Id>16</Id>
-    <RelativePath>pattern.s</RelativePath>
+    <RelativePath>views/pattern.s</RelativePath>
     <Mode>IncludeInAssembly</Mode>
   </File>
   <File>
@@ -188,7 +188,7 @@
   </File>
   <File>
     <Id>20</Id>
-    <RelativePath>song.s</RelativePath>
+    <RelativePath>views/song.s</RelativePath>
     <Mode>IncludeInAssembly</Mode>
   </File>
   <File>
@@ -203,12 +203,12 @@
   </File>
   <File>
     <Id>23</Id>
-    <RelativePath>chain.s</RelativePath>
+    <RelativePath>views/chain.s</RelativePath>
     <Mode>IncludeInAssembly</Mode>
   </File>
   <File>
     <Id>24</Id>
-    <RelativePath>hirom.cfg</RelativePath>
+    <RelativePath>config/hirom.cfg</RelativePath>
     <Mode>LinkerConfig</Mode>
   </File>
   <File>
@@ -326,7 +326,7 @@
   </File>
   <File>
     <Id>32</Id>
-    <RelativePath>samples.s</RelativePath>
+    <RelativePath>views/samples.s</RelativePath>
     <Mode>IncludeInAssembly</Mode>
   </File>
   <File>
@@ -406,5 +406,10 @@
         <Value>0</Value>
       </Property>
     </Pipeline>
+  </File>
+  <File>
+    <Id>36</Id>
+    <RelativePath>views/instrument.s</RelativePath>
+    <Mode>IncludeInAssembly</Mode>
   </File>
 </BrewmasterProject>

@@ -4,6 +4,8 @@
 .import PlaySinglePhrase, PrepareTestPatternPlayback, StopPlayback, SwitchToSingleNoteMode, TransferSingleNoteToSpcAndPlay
 .import UpdateNoteInPlayback, NoteDataOffsetInPhrase
 
+MAX_INSTRUMENTS = 53
+
 .segment "CODE7"
 Name: .byte "Phrase_-_",$ff
 
@@ -29,6 +31,7 @@ CurrentPhraseIndex: .res 1
 CurrentPhraseIndexInSongData: .res 2
 SourcePointer: .res 3 ; far address source pointer necessary because phrase data is spread across multiple banks
 TilemapOffset: .res 2
+FirstUnusedInstrument: .res 1
 
 .segment "CODE6"
 
@@ -60,7 +63,7 @@ FocusView:
 
 	Bind Input_StartPlayback, StartPlayback
 	Bind Input_CustomHandler, HandleInput
-	Bind Input_NavigateIn, NoAction
+	Bind Input_NavigateIn, NavigateFromCursorPosition
 	Bind Input_NavigateBack, ReturnToChainView
 	Bind OnPlaybackStopped, SwitchToSingleNoteMode
 
@@ -92,6 +95,7 @@ LoadView:
 	lda #1
 	sta ShowBg3
 	
+	jsr GetFirstUnusedInstrument	
 	jsl UpdateHighlight_long
 rts
 .export Pattern_HideView = HideView
@@ -100,6 +104,29 @@ HideView:
 	stz ShowBg3
 rts
 
+GetFirstUnusedInstrument:
+	ldx #0
+	@loop:
+		lda f:INSTRUMENTS,X
+		cmp #$ff
+		beq @store
+		seta16
+			txa
+			clc
+			adc #8
+			tax
+		seta8
+		cpx #MAX_INSTRUMENTS*8
+	bne @loop
+	@store:
+	seta16
+	txa
+	lsr
+	lsr
+	lsr
+	seta8
+	sta FirstUnusedInstrument
+rts
 
 LoadGlobalData:
 @sourcePointer = 0
@@ -427,10 +454,31 @@ CutCurrentlyPlayingNote:
 rts
 
 NoAction: rts
+.import Chain_ChildViewInFocus
 ReturnToChainView:
 	lda #1
+	stz Chain_ChildViewInFocus
 	ldy #$ff ; Reuse already loaded chain
 jmp NavigateToScreen
+
+NavigateFromCursorPosition:
+	lda CursorPositionCol
+	cmp #1
+	bne @break
+	ldx CursorPositionRow
+	lda PatternNotes,x
+	cmp #$ff
+	beq @break
+	lda PatternInstruments,x
+	cmp #$ff
+	beq @break
+		tay
+		lda #3
+		jmp NavigateToScreen
+	rts
+	@break:
+jmp PlayMosaic
+
 
 HandleInput:
 
@@ -694,14 +742,19 @@ ChangeCurrentInstrument:
 	adc PatternInstruments,x
 	bpl :+
 		lda #0
-		bra :++
+		bra @continue
 	:
-	cmp #6 ; TODO: Number of instruments (but maintain 53 as max)
-;	cmp #53 ; TODO: Number of instruments (but maintain 53 as max)
-	bcc :+
-		lda #6
+	cmp FirstUnusedInstrument
+	bcc @continue
+		lda FirstUnusedInstrument
+		bra @continue
+
+	cmp #MAX_INSTRUMENTS
+	bcc @continue
+		lda #MAX_INSTRUMENTS
 		dec
-	:
+
+	@continue:
 	sta PatternInstruments,x
 	jsr NoteWasChanged
 jmp PlayCurrentNote

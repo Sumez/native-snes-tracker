@@ -15,6 +15,7 @@
     - Fresh insert on song or chain view will insert the next unused index
     - Button to copy an inserted chain or phrase to a new one (if another entry exists)
     - Hold Delete while moving cursor to delete multiple
+    - Make it visible ("greyed out"?) that a chain/phrase/instrument is "empty"/uncreated where selecting it
 - Rudimentary GUI
     - More pleasant temporary graphics
     - Visible UI hints for easier navigation
@@ -22,15 +23,15 @@
     - Highlight columns instead of rows on song view
     - `Convert tracker font to 2bpp and move to BG3 layer, use BG2 for UI graphics`
 - Basic tracker commands
-    - Implement the ones already supported in the sound driver first - Pitch up/down, volume slide, arpeggio - loop and tempo change should be in song data instead?
+    - Implement the ones already supported in the sound driver first - Pitch up/down, volume slide, arpeggio - loop and tempo change should be in song data instead? <sup>Partly implemented</sup>
     - ~~"Key off" entries~~ <sup>Done</sup>
-- Edit instruments in tracker
+- Edit instruments in tracker <sup>Partly implemented</sup>
 - Improved sound driver
     - Better use of keyoff/keyon control instead of manual volume
     - ADSR support on instruments
     - Transpose chains
-- Companion software for adding custom samples
-    - Ability to add as many samples as ExHiRom can fit
+- ✅ Companion software for adding custom samples <sup>Done</sup>
+    - ~~Ability to add as many samples as ExHiRom can fit~~ <sup>Done</sup>
     - ~~Manually pick which samples to include in a song in the song settings inside the tracker~~ <sup>Done</sup>
     - ~~`Rewrite to use HiRom or ExHiRom`~~ <sup>Done</sup>
 - Make various SNES specific features available, make controlling DSP registers more direct using commands

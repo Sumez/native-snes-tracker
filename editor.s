@@ -23,13 +23,13 @@ UiTilemapBuffer:
 	SONG: .res $800 ; $0-FF, 8 channels per row
 	SAMPLES: .res 16*64 ; 64 entries, with an index and 14-char name-check each
 	.segment "SRAM2"
-	CHAINS: .res $2000 ; 2 bytes (phrase ref and transpose), 16 rows, $80 different chains of $20 each
+	CHAINS: .res $2000 ; 2 bytes (phrase ref and transpose), 16 rows, $100 different chains of $20 each
 	.segment "SRAM3"
 	PHRASES_1: .res $2000 ; 4 bytes (note, instr, command, cmdparam) * 16 rows. $80 different phrases of $40 each
 	.segment "SRAM4"
 	PHRASES_2: .res $2000 ; 4 bytes (note, instr, command, cmdparam) * 16 rows. $80 different phrases of $40 each
 	.segment "SRAM5"
-	INSTRUMENTS: .res $100 ; ??
+	INSTRUMENTS: .res $200 ; 64 (max 53) instruments of 8 bytes each
 	META: .res $800 ; Future feature: custom meta data for song - colors to help with navigation etc.
 	.segment "SRAM6"
 	PHRASES_3: .res $2000 ; For future expansion
@@ -47,7 +47,7 @@ UiTilemapBuffer:
 	CHAINS: .res $2000 ; 2 bytes (phrase ref and transpose), 16 rows, $100 different chains of $20 each
 	PHRASES_1: .res $2000 ; 4 bytes (note, instr, command, cmdparam) * 16 rows. $100 different phrases of $40 each
 	PHRASES_2: .res $2000 ; 4 bytes (note, instr, command, cmdparam) * 16 rows. $100 different phrases of $40 each
-	INSTRUMENTS: .res $100 ; ??
+	INSTRUMENTS: .res $200 ; ??
 	META: .res $800 ; Future feature: custom meta data for song - colors to help with navigation etc.
 	PHRASES_3: .res $2000
 	PHRASES_4: .res $2000
@@ -236,7 +236,7 @@ jmp NavigateToScreen
 
 LoadSong:
 @HeaderVerificationCode = $EFCD ; Constant, indicates Initialized SRAM data
-@SaveBreakingBuildVersion = 1;TODO! 	; Increased every time a public build breaks older save data. If feeling nice, create code to convert from one version to another
+@SaveBreakingBuildVersion = 2;TODO! 	; Increased every time a public build breaks older save data. If feeling nice, create code to convert from one version to another
 	phb
 	lda #^HEADER
 	pha
@@ -246,15 +246,22 @@ LoadSong:
 	lda HEADER+2
 	cpx #@HeaderVerificationCode
 	bne @resetData
-		cmp #@SaveBreakingBuildVersion
-		; TODO: Give user a nice message asking them if they want to reset the data, or give them a change to back it up first
-		bne :+
-			plb
-			rts ; Valid song already present, use sram as-is
-		:
-		cmp #0
-		bne @resetData
-			jmp @resetSamples ; 0->1 = Add default "addedsamples"
+	cmp #@SaveBreakingBuildVersion
+	; TODO: Give user a nice message asking them if they want to reset the data, or give them a change to back it up first
+	bne :+
+		plb
+		rts ; Valid song already present, use sram as-is
+	:
+		
+	; Valid song data but old version:
+	cmp #0
+	bne :+
+		jmp @resetSamples ; 0->1/2 = Add default "addedsamples"
+	:
+	cmp #1
+	bne :+
+		jmp @resetSamples ; 1->2 = Fill more empty instrument data. Also: updated samples :\
+	:
 	@resetData:	
 	lda #$ff
 	ldx #0
@@ -298,14 +305,6 @@ LoadSong:
 		cpx #$2000
 	bne :-
 	
-	lda #$ff
-	ldx #0
-	:
-		sta f:INSTRUMENTS,X
-		inx
-		cpx #$100
-	bne :-
-	
 	lda #$00
 	ldx #0
 	:	sta f:META,X
@@ -328,6 +327,15 @@ LoadSong:
 		cpx #(16*64)
 	bne :-
 	
+	@resetInstruments:
+	lda #$ff
+	ldx #0
+	:
+		sta f:INSTRUMENTS,X
+		inx
+		cpx #$200
+	bne :-
+		
 	
 	ldx #@HeaderVerificationCode
 	stx HEADER
@@ -452,8 +460,8 @@ LoadView:
 	stx z:LoadView_TilemapOffset
 	jumpTable ViewLoaders
 rtl
-ViewLoaders: .import Song_FocusView, Chain_FocusView, Pattern_FocusView, Samples_FocusView
-.addr Song_FocusView, Chain_FocusView, Pattern_FocusView, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+ViewLoaders: .import Song_FocusView, Chain_FocusView, Pattern_FocusView, Instrument_FocusView, Samples_FocusView
+.addr Song_FocusView, Chain_FocusView, Pattern_FocusView, Instrument_FocusView, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 .addr 0, Samples_FocusView
 
 .segment "CODE7"

@@ -1,7 +1,7 @@
 .include "global.inc"
 .include "src/snes.inc"
 
-.export LoadSamples
+.export LoadSamples, SampleDirectory, AddedSamples
 .import StopPlayback
 .import SAMPLE_DATA
 
@@ -10,9 +10,9 @@ Name: .byte "Samples",$ff
 
 .segment "BSS7E"
 	
-	; Code-friendly reference to sample ROM data
-	; 6 bytes: PPPxSS, PPP is a 24bit pointer to sample start, SS is ~size in kilobytes
-	SampleDirectory: .res 6*1000+3
+	; Code-friendly reference to sample ROM data, global for tracker, shared between songs
+	; 8 bytes: PPPxSSAA, PPP is a 24bit pointer to sample start, SS is ~size in kilobytes, AA is the pitch adjustment
+	SampleDirectory: .res 8*1000+3
 
 .segment "ZEROPAGE"
 
@@ -21,7 +21,7 @@ Name: .byte "Samples",$ff
 .segment "BSS"
 
 	CursorRow: .res 2
-	AddedSamples: .res (2*64)+2 ; Ordered list of 16bit indexes into SampleDirectory
+	AddedSamples: .res (2*64)+2 ; Ordered list of 16bit offsets into SampleDirectory. Unique to current song, and loaded by checking Sample Name references
 	NumberOfSamples: .res 2 ; That's a lotta samples :O :O :O
 	SamplesUpdated: .res 2
 	TotalSampleDataSizeInSpc: .res 2
@@ -32,11 +32,19 @@ Name: .byte "Samples",$ff
 .export Samples_Init = Init
 Init:
 	stz IsPlaying ; Prevents trying to stop non-existant playback before transfering samples
+	jsl PrepareSampleEdit
+	jsl LoadSamplesIntoSpcDuringInit
+rtl
+
+.export Samples_PrepareSampleEdit = PrepareSampleEdit
+PrepareSampleEdit:
 	jsl LoadSamples
 	ldx #$ffff
 	stx AddedSamples
 	jsl LoadSongData
-	jsl LoadSamplesIntoSpcDuringInit
+
+	ldx #0
+	stx SamplesUpdated
 rtl
 
 .export Samples_FocusView = FocusView
@@ -62,8 +70,7 @@ LoadView:
 	ldx z:LoadView_TilemapOffset
 	stx TilemapOffset
 
-	jsl LoadSamples ; Might as well load samples again in case someone loaded a savestate after patching rom with new samples
-	jsl LoadSongData
+	jsl PrepareSampleEdit ; Might as well load samples again in case someone loaded a savestate after patching rom with new samples
 		
 	jsl WriteTilemapBuffer
 rts
@@ -91,9 +98,7 @@ LoadSamples:
 		beq @end ; Size = 0 - no more samples
 		
 		sty @titleLength
-		ldy NumberOfSamples
-		iny
-		sty NumberOfSamples
+		inc NumberOfSamples
 		pha
 		
 		; Write reference to sample in directory
@@ -107,11 +112,19 @@ LoadSamples:
 		lsr
 		lsr ; Divide by 1024
 		sta f:SampleDirectory+4,X
+		
+		iny
+		iny
+		lda [@samplePointer],Y ; read pitch adjust
+		sta f:SampleDirectory+6,X
+		
 		lda @samplePointer
 		sta f:SampleDirectory,X
 		lda @samplePointer+2
 		and #$00FF
 		sta f:SampleDirectory+2,X
+		inx
+		inx
 		inx
 		inx
 		inx
@@ -161,8 +174,8 @@ seta16
 seta8	
 rtl
 
+.a16
 UpdateSongData:
-seta16
 	ldx #0
 	ldy #0
 	:
@@ -180,8 +193,8 @@ seta16
 		cpy #128
 	bne :-
 	@end:
-seta8	
 rtl
+.a8
 
 WriteTilemapBuffer:
 @samplePointer = 0
@@ -203,7 +216,6 @@ seta8
 	pha
 	plb
 
-	ldy @tilemapOffset
 	ldx #0
 	stx @directoryOffset
 	@loop:
@@ -222,13 +234,10 @@ seta8
 		seta8
 		pha ; Store sample size
 		seta16
-		inx
-		inx
-		inx
-		inx
-		inx
-		inx
-		stx @directoryOffset
+		txa
+		clc
+		adc #8
+		sta @directoryOffset
 		
 		jsr FindAddedSample ; Detect if the sample is already added to song, and store index on stack
 		lsr
@@ -307,12 +316,17 @@ rtl
 .segment "CODE7"
 NoAction: rts
 NavigateBack:
+	jsr RefreshSamplesInSpc
+jmp NavigateToPreviousScreen
+
+.export Samples_RefreshSamplesInSpc = RefreshSamplesInSpc
+RefreshSamplesInSpc:
 	lda SamplesUpdated
 	beq :+
 		; TODO: Display friendly message on screen
 		jsr LoadSamplesIntoSpc
 	:
-jmp NavigateToPreviousScreen
+rts
 
 ShowCursor_long: jsr ShowCursor
 rtl
@@ -378,6 +392,27 @@ MoveCursorUp:
 	seta8
 jmp ShowCursor
 
+.export Samples_RemoveAddedSample = RemoveAddedSample
+RemoveAddedSample:
+	seta16
+	and #$00ff
+	asl
+	tax
+	jsr removeSampleFromIndex
+	seta8
+rts
+
+.export Samples_TryAddSample = TryAddSample
+TryAddSample: .a16
+	; Gets AddedSample index if exists, otherwise adds to sample list
+	sta DirectoryIndexToMatch
+	jsl FindAddedSample_long
+	cmp #$ffff
+	bne :+
+		jmp tryAddSampleToIndex
+	:
+rts
+.a8
 
 ToggleAddedSample:
 	seta16
@@ -386,16 +421,16 @@ ToggleAddedSample:
 	jsl FindAddedSample_long
 	cmp #$ffff
 	beq :+
-		jsr @removeSample
+		jsr removeSampleFromIndex
 		bra @end
 	:
-		jsr @tryAddSample
+		jsr tryAddSampleToIndex
 	@end:
 	seta8
 	jsl WriteTilemapBuffer
 rts
 .a16
-@removeSample:
+removeSampleFromIndex:
 	lda #$ffff
 	sta AddedSamples,X
 	:
@@ -416,23 +451,26 @@ rts
 	sta AddedSamples-2,X
 jmp MarkSampleListUpdated
 
-@tryAddSample:
+tryAddSampleToIndex:
 	cpx #(64*2) ; Enforce maximum number of added sample
 	bcc :+; Also: Add up sizes of all added samples to check enforce a max sample size limit
 		seta8
-		jmp PlayMosaic
+		jsr PlayMosaic
 		seta16
+		lda #$ffff
 		rts
 	:
 	lda DirectoryIndexToMatch
 	sta AddedSamples,X
-jmp MarkSampleListUpdated
+	phx
+	jsr MarkSampleListUpdated
+	pla
+rts
 
 
 MarkSampleListUpdated:
 	ldx #1
 	stx SamplesUpdated
-	
 	jsl UpdateSongData
 rts
 
@@ -440,9 +478,8 @@ rts
 GetHighlightedSample:
 	lda CursorRow
 	asl
-	sta 0
 	asl
-	adc 0 ;x6
+	asl ;x8
 rts
 .a8
 

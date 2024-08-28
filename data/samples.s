@@ -41,22 +41,22 @@ SampleInsertionPoint: .byte $ff,$00,$00
 .export DefaultSamples, DefaultSamplesEnd
 DefaultSamples:
 .align 16,$ff
-.addr 1*6
+.addr 1*8
 .byte"Sample_1"
 .align 16,$ff
-.addr 2*6
+.addr 2*8
 .byte"Sample_2"
 .align 16,$ff
-.addr 3*6
+.addr 3*8
 .byte"Sample_3"
 .align 16,$ff
-.addr 5*6
+.addr 5*8
 .byte"Sample_5"
 .align 16,$ff
-.addr 6*6
+.addr 6*8
 .byte"Sample_6"
 .align 16,$ff
-.addr 0*6
+.addr 0*8
 .byte"Sample_0"
 .align 16,$ff
 DefaultSamplesEnd:

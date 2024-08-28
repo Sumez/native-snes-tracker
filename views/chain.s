@@ -20,6 +20,8 @@ CurrentChainIndex: .res 1
 CurrentChainIndexInGlobalSong: .res 2
 TilemapOffset: .res 2
 ChildTilemapOffset: .res 2
+ChildViewInFocus: .res 1
+.export Chain_ChildViewInFocus = ChildViewInFocus
 
 .segment "CODE6"
 
@@ -49,6 +51,11 @@ FocusView:
 	
 	jsl UpdateHighlight_long
 	jsl ShowCursor_long
+
+	lda ChildViewInFocus
+	beq :+
+		jsl NavigateToPhrase_long
+	:
 rts
 
 .export Chain_LoadView = LoadView
@@ -64,10 +71,10 @@ seta8
 	cmp #$ff
 	beq :+
 		jsl LoadGlobalData
+		stz ChildViewInFocus
 	:
 		
 	jsl WriteTilemapBuffer
-
 rts
 
 .import Pattern_LoadView, Pattern_HideView, Pattern_FocusView
@@ -197,12 +204,16 @@ NoAction: rts
 NavigateToSong:
 	lda #0
 jmp NavigateToScreen
+NavigateToPhrase_long: jsr NavigateToPhrase
+rtl
 NavigateToPhrase:
 	ldx CursorRow
 	lda PhraseIndexes,x
 	cmp #$ff
 	beq :+
 		tay
+		lda #1
+		sta ChildViewInFocus
 		jsl JumpToChildView
 		rts
 	:
