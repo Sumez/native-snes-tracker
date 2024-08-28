@@ -4,11 +4,11 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="Patcher.MessageBox"
-				Width="500"
-				Height="100"
+				Width="600"
+				Height="200"
 				CanResize="false"
         Title="MessageBox">
-	<StackPanel VerticalAlignment="Center" Spacing="10">
+	<StackPanel VerticalAlignment="Center" Spacing="10" Margin="10">
 		<TextBlock Name="Message" HorizontalAlignment="Center"></TextBlock>
 		<Button Click="CloseWindow" HorizontalAlignment="Center">Ok then</Button>
 	</StackPanel>

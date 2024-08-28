@@ -80,26 +80,60 @@ public partial class MainWindow : Window
 			FileTypeFilter = new[] { new FilePickerFileType("Super Chrono Tracker BSDJ '94") { Patterns = new[] { "bsdj.sfc" } } }
 		});
 
-		if (files.Count < 1) return;
+		if (files.Count != 1) return;
 		await UseRomFile(files[0]);
+	}
+
+	public async void ExportSamplePack(object? sender, RoutedEventArgs args)
+	{
+		using var sourceStream = await GetSamplePackStream();
+		if (sourceStream == null) return;
+		var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+		{
+			Title = "Export BRR samples with headers to single embeddable file",
+			SuggestedFileName = "samples.brrp",
+			ShowOverwritePrompt = true,
+			DefaultExtension = "brrp"
+		});
+		if (file == null) return;
+
+		using var stream = await file.OpenWriteAsync();
+		sourceStream.CopyTo(stream);
+		await new MessageBox($"Sample pack exported to {file.Name}!").ShowDialog(this);
 	}
 	public async void PatchRom(object? sender, RoutedEventArgs args)
 	{
 		if (Patch.RomFilePath == null) return;
+		using var sourceStream = await GetSamplePackStream();
+		if (sourceStream == null) return;
 
-		var selectedSamples = Patch.AvailableSamples.Where(s => s.Selected && s.BrrSample != null);
-
-		var duplicateSampleNames = selectedSamples.GroupBy(s => s.Name).Where(g => g.Count() > 1);
-		if (duplicateSampleNames.Any())
+		using var stream = File.OpenWrite(Patch.RomFilePath);
+		if (stream.Length < PatchedSamplesStartAddress + sourceStream.Length)
 		{
-			var message = new StringBuilder("Error: The following sample names are duplicated:\n");
-			foreach (var group in duplicateSampleNames) message.Append(group.Key).Append('\n');
-			message.Append("\nPlease rename or remove duplicates.");
-			await new MessageBox(message.ToString()).ShowDialog(this);
+			await new MessageBox("Error: ROM file is too small to contain all selected samples.").ShowDialog(this);
 			return;
 		}
+		stream.Position = PatchedSamplesStartAddress;
+		sourceStream.CopyTo(stream);
 
-		using var writer = new BinaryWriter(new MemoryStream());
+		await new MessageBox("ROM patched successfully!").ShowDialog(this);
+	}
+
+	private async Task<Stream?> GetSamplePackStream()
+	{
+		var selectedSamples = Patch.AvailableSamples.Where(s => s.Selected && s.BrrSample != null);
+
+		var duplicateSampleNames = selectedSamples.GroupBy(s => s.Name.Substring(0, Math.Min(s.Name.Length, 14))).Where(g => g.Count() > 1);
+		if (duplicateSampleNames.Any())
+		{
+			var message = new StringBuilder("Name conflict issue: Several samples start with this as the first 14 character:\n");
+			foreach (var group in duplicateSampleNames) message.Append(group.Key).Append('\n');
+			message.Append("\nThe tracker uses the first part of the name to tell which samples are used\nby a song. Please rename or remove duplicates.");
+			await new MessageBox(message.ToString()).ShowDialog(this);
+			return null;
+		}
+
+		var writer = new BinaryWriter(new MemoryStream());
 		foreach (var sample in selectedSamples)
 		{
 			if (sample.BrrSample == null) continue;
@@ -114,19 +148,10 @@ public partial class MainWindow : Window
 		// Write empty sample at the end to indicate end of data
 		writer.Write((byte)0xFF);
 		writer.Write((Int16)0);
-
-		using var stream = File.OpenWrite(Patch.RomFilePath);
-		if (stream.Length < PatchedSamplesStartAddress + writer.BaseStream.Length)
-		{
-			await new MessageBox("Error: ROM file is too small to contain all selected samples.").ShowDialog(this);
-			return;
-		}
-		stream.Position = PatchedSamplesStartAddress;
 		writer.BaseStream.Position = 0;
-		writer.BaseStream.CopyTo(stream);
-
-		await new MessageBox("ROM patched successfully!").ShowDialog(this);
+		return writer.BaseStream;
 	}
+
 	private async Task UseRomFile(IStorageFile file)
 	{
 		Patch.RomFilePath = file.Path.LocalPath;

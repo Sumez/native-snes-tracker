@@ -36,7 +36,8 @@
 			</StackPanel>
 		</Border>
 		<Button DockPanel.Dock="Top" IsVisible="{Binding RomFilePath, Converter={x:Static ObjectConverters.IsNull}}" Margin="10" HorizontalAlignment="Stretch" Click="PickRomImage">Pick ROM image to patch</Button>
-		<Button DockPanel.Dock="Bottom" IsEnabled="{Binding RomFilePath, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="10" HorizontalAlignment="Stretch" Click="PatchRom">Patch ROM!</Button>
+		<Button DockPanel.Dock="Bottom" IsEnabled="{Binding RomFilePath, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="10,2,10,10" HorizontalAlignment="Stretch" Click="ExportSamplePack">Export sample pack...</Button>
+		<Button DockPanel.Dock="Bottom" IsEnabled="{Binding RomFilePath, Converter={x:Static ObjectConverters.IsNotNull}}" Margin="10,10,10,2" HorizontalAlignment="Stretch" Click="PatchRom">Patch ROM!</Button>
 		<Border IsVisible="{Binding RomFilePath, Converter={x:Static ObjectConverters.IsNotNull}}" Classes="DropArea" Margin="5,5" Name="SampleSources" CornerRadius="4" BorderThickness="0" DragDrop.AllowDrop="True">
 			<ScrollViewer Padding="10,5">
 				<StackPanel>

@@ -27,6 +27,8 @@ public partial class SampleFile : UserControl
 		Bitrate.TextChanged += Bitrate_TextChanged;
 		Bitrate.PointerReleased += (o, e) => { e.Handled = true; };
 
+
+		NameInput.PointerReleased += (o, e) => { e.Handled = true; }; 
 		NameInput.LostFocus += (o, e) => EndEditName();
 		NameInput.KeyDown += (o, e) =>
 		{
