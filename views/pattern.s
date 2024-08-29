@@ -4,8 +4,6 @@
 .import PlaySinglePhrase, PrepareTestPatternPlayback, StopPlayback, SwitchToSingleNoteMode, TransferSingleNoteToSpcAndPlay
 .import UpdateNoteInPlayback, NoteDataOffsetInPhrase
 
-MAX_INSTRUMENTS = 53
-
 .segment "CODE7"
 Name: .byte "Phrase_-_",$ff
 
@@ -104,7 +102,8 @@ HideView:
 	stz ShowBg3
 rts
 
-GetFirstUnusedInstrument:
+.export GetFirstUnusedInstrumentOffset
+GetFirstUnusedInstrumentOffset:
 	ldx #0
 	@loop:
 		lda f:INSTRUMENTS,X
@@ -119,6 +118,9 @@ GetFirstUnusedInstrument:
 		cpx #MAX_INSTRUMENTS*8
 	bne @loop
 	@store:
+rts
+GetFirstUnusedInstrument:
+	jsr GetFirstUnusedInstrumentOffset
 	seta16
 	txa
 	lsr
@@ -889,8 +891,9 @@ jmp UpdateCursorSpriteAndHighlight
 PreparePlayback_long: jsr PrepareTestPatternPlayback
 rtl
 
+; TODO: Separate and move to playback.s
 CompileCurrentNoteToBuffer:
-	ldx #Pattern01Offset
+	ldx z:SingleNotePatternOffsetInSpcSource
 	ldy CursorPositionRow
 	
 	lda PatternInstruments,Y

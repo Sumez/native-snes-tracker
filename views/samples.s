@@ -367,7 +367,7 @@ HandleInput:
 	:
 	bit #>KEY_Y
 	beq :+
-		jsr ToggleAddedSample
+		;jsr ToggleAddedSample
 	:
 
 jmp ShowCursor

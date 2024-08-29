@@ -1,6 +1,8 @@
 .global PatternNotes,PatternInstruments
 .define GAME_TITLE "SuperTrax94"
 
+MAX_INSTRUMENTS = 53
+
 .define TilemapBufferSegment "BSS7E"
 .define CompiledPlaybackDataSegment "BSS7F"
 
@@ -9,7 +11,7 @@
 .globalzp Input_CustomHandler, Input_NavigateIn, Input_NavigateBack, Input_MoveLeft, Input_MoveUp, Input_MoveRight, Input_MoveDown
 .globalzp Input_StartPlayback, OnPlaybackStopped
 .global CurrentScreen, IsPlaying, CompiledPattern, TilemapBuffer, UiTilemapBuffer, EditMode
-.global Pattern01Offset ; Unsure about these
+.globalzp SingleNotePatternOffsetInSpcSource ; Unsure about these
 
 ; Temp variables
 LoadView_TilemapOffset = 0

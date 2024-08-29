@@ -5,6 +5,7 @@
 .importzp BrewsicTransferDestination
 .import BrewsicPlayTrack, BrewsicTransfer, BrewsicPlaySound, BrewsicStopTrack
 .import Song_UpdateHighlight, Chain_UpdateHighlight, Pattern_UpdateBeatHighlight
+.import AddedSamples, SampleDirectory
 
 .export Playback_Update = Update
 .export PrepareTestPatternPlayback, UpdateNoteInPlayback, NoteDataOffsetInPhrase
@@ -12,6 +13,8 @@
 .export StopPlayback
 .export SwitchToSingleNoteMode, TransferSingleNoteToSpcAndPlay
 
+
+PatternReferenceOffset = 18 ; Pattern references always start 18 bytes into data
 
 .segment "BSS"
 IsPlaying: .res 1
@@ -35,6 +38,9 @@ BarCounter = PatternToFind ; Reuse this variable since the two routines always r
 CurrentCompileIndex: .res 2
 CurrentPatternOffset: .res 2
 EmptyPatternOffset: .res 2
+SingleNotePatternOffset: .res 2
+SingleNotePatternOffsetInSpcSource: .res 2
+TestPatternOffset: .res 2
 FirstRowPatternOffset: .res 2
 SecondRowPatternOffset: .res 2
 SecondRowPatternEnd: .res 2
@@ -109,27 +115,18 @@ PrepareTestPatternPlayback:
 	; Prepare a dummy test pattern so we can initiate a single note playing as quickly as possible
 	lda IsPlaying
 	sta QueuePreparePlayback ; If playing, don't prepare now, but enqueue until current playback ended to avoid conflicting with it
-	bne :+
-		jsr CopyTestPatternsToSpcBuffer
-		ldy #$100
-		jsr TransferPlaybackBufferToSpc
+	beq :+
+		rts
 	:
-rts
-
-CopyTestPatternsToSpcBuffer:
-	ldx #0
-	:
-		lda f:TestPatternSource,X
-		sta f:CompiledPattern,X
-		inx
-		cpx #Pattern16Index+18
-	bne :-
+	
+	jsl CompileTestPattern
+	jsr TransferEntirePlaybackBufferToSpc
 rts
 
 PlaySinglePhrase:
 	phx
 	;Update the "current phrase" for playback visual feedback
-	sta PhraseOfChannel
+	sta PhraseOfChannel+0
 	;Also update reference list to play back changes while phrase is edited
 	sta PatternOffsetReferences
 	ldy #0
@@ -194,10 +191,10 @@ SwitchToSingleNoteMode:
 
 	; Switch to playing single note pattern
 	seta16
-	lda #Pattern01Index
+	lda z:SingleNotePatternOffset
 	sta f:CompiledPattern+PatternReferenceOffset
 
-	lda #SilentPatternIndex
+	lda z:EmptyPatternOffset
 	sta f:CompiledPattern+PatternReferenceOffset+2
 	sta f:CompiledPattern+PatternReferenceOffset+4
 	sta f:CompiledPattern+PatternReferenceOffset+6
@@ -265,13 +262,21 @@ TransferPatternReferencesToSpc:
 	ldy #4
 jmp spcTransfer
 TransferSingleNoteToSpcAndPlay:
-	ldx #Pattern01Offset
+	ldx z:SingleNotePatternOffsetInSpcSource
 	ldy #8
 	jsr spcTransfer
 ;	lda #1 ; #1 indicated playing one note
 ;	sta IsPlaying
 	lda #0
 jmp BrewsicPlayTrack
+TransferEntirePlaybackBufferToSpc:
+	seta16
+	lda CurrentPatternOffset
+	clc
+	adc #18
+	tay
+	seta8
+jmp TransferPlaybackBufferToSpc
 TransferEntirePlaybackBufferToSpcAndPlay:
 lda #$ff
 sta Playback_CurrentBeatRow ; TODO: Initiate all three Arrow data values depending on how playback was started
@@ -355,6 +360,53 @@ UpdateNoteInPlayback: ; !!! Needs to preserve [X] into CompileSingleNoteBar
 
 .segment "CODE6"
 
+CompileTestPattern:
+	; Test pattern used specifically for testing playback of single phrases or single notes
+	
+	phb
+	lda #^CompiledPattern
+	pha
+	plb
+
+	lda #16+2+1+1+2 ; 8 order references (one row of 8 channels) + $ffff at the end + one row looping forever + $00 $at the end + $ffff for empty macro dir
+	jsr CopySongHeaderAndCalculateOffsets
+	.a16
+	jsr AddEmptyPattern
+	jsr AddSingleNotePattern
+	jsr AddSinglePhrasePattern
+
+	ldy z:PatternIndexOffset
+	
+	lda z:SingleNotePatternOffset
+	sta CompiledPattern,Y
+	iny
+	iny
+	lda z:EmptyPatternOffset
+	ldx #7 ; Only playing a single phrase, so add a bunch of empty patterns
+	:	sta CompiledPattern,Y ; Can be anything other than $FFFF, really
+		iny
+		iny
+		dex
+	bne :-
+	; Y = The end of the second row of pattern reference rows
+	
+	lda #$ffff ; End of pattern refs
+	sta CompiledPattern,Y
+	iny
+	iny
+	lda #16 ; This tracker only makes 16-bar patterns
+	sta CompiledPattern,Y
+	iny
+	lda #0 ; End of pattern lengths
+	sta CompiledPattern,Y
+	iny
+	
+	jsr CopyMacrosAndInstruments	
+	
+	seta8
+	plb
+rtl
+
 CompilePhraseToBuffer:	; !!! Needs to preserve [X] into CompileSinglePattern
 	
 	phb
@@ -364,7 +416,7 @@ CompilePhraseToBuffer:	; !!! Needs to preserve [X] into CompileSinglePattern
 	
 	; Switch test pattern's reference list to playing full phrase
 	seta16
-	lda #Pattern16Index
+	lda z:TestPatternOffset
 	sta f:PatternOffsetReferences+1
 	sta f:CompiledPattern+PatternReferenceOffset
 	
@@ -414,35 +466,19 @@ CompileNextRowInSong:
 	plb
 rtl
 
-CopyCurrentSongToSpcBuffer:
+CopySongHeaderAndCalculateOffsets:
+.import GetFirstUnusedInstrumentOffset
 @instrumentSize = 0
 
-	phb
-	lda #^CompiledPattern
 	pha
-	plb
-	
-	lda #$ff
-	sta f:PatternOffsetReferences ; $FF indicates the first empty entry, just move the $FF every time an entry is added to prevent looping through the whole thing
-	sta f:PatternOffsetReferencesAlternating ; $FF indicates the first empty entry, just move the $FF every time an entry is added to prevent looping through the whole thing
+	jsr GetFirstUnusedInstrumentOffset
+	stx @instrumentSize ; Instrument size in song and SPC data are 1:1 (8 bytes) so offset can be used as-is
+	pla
 	seta16
-
-	; TODO: use available instruments
-	lda #8*6
-	sta @instrumentSize
-
-	; Add up all our numbers to find the index where pattern data starts	
-	lda #32+2+2+1+2 ; all constant numbers from below added up
+	and #$ff
 	clc
-	;adc #32 ; 16 order references (two rows of 8 channels)
-	;adc #2 ; $ffff at the end
-	;adc #2 ; two rows looping forever
-	;adc #1 ; $00 $at the end
-	;adc #2; $ffff for empty macro dir
-	adc @instrumentSize
-	
-	tay
-	jsr AddEmptyPattern
+	adc @instrumentSize	
+	tay ; Now Y = where we start writing pattern data
 
 	; HEADER
 	; TODO: Actually generate 18 byte header based on song settings
@@ -454,7 +490,92 @@ CopyCurrentSongToSpcBuffer:
 		cpx #18 ; Header length
 	bne :-
 	stx z:PatternIndexOffset
+rts
 
+.a16
+CopyMacrosAndInstruments:
+	lda #$ffff ; Empty macro table
+	sta CompiledPattern,Y
+	iny
+	iny
+	
+	ldx #0
+	:
+;$01 ; sample
+;$FFF7 ; pitch adjust
+;$00 ; fadeout
+;$A0 ; volume
+;$0000 ; volume envelope address
+;0 ; unused
+
+		lda f:INSTRUMENTS+0,X ; Get Added-sample Index
+		and #$00ff
+		cmp #$ff
+		beq @breakInstrumentLoop
+		
+		phx
+		sta CompiledPattern+0,Y
+		asl
+		tax
+		lda f:AddedSamples,X
+		tax
+		lda f:SampleDirectory+6,X ; Get pitch-adjust from sample directory
+		sta CompiledPattern+1,Y
+		plx
+		
+		lda #$00
+		sta CompiledPattern+3,Y ; No fadeout implemented yet(?? - just just ADSR envolope)
+		lda f:INSTRUMENTS+3,X ; Volume (8bit)
+		sta CompiledPattern+4,Y
+		lda #$0000
+		sta CompiledPattern+5,Y ; No volume envelope implemented yet
+		sta CompiledPattern+6,Y ; No volume envelope implemented yet
+
+		
+		tya
+		clc
+		
+		adc #8
+		tay
+		
+		txa
+		clc
+		adc #8
+		tax
+	bra :-
+	@breakInstrumentLoop:
+	
+	sty CurrentCompileIndex
+	
+	; Integrity check, used only for debugging. Should NEVER go to BRK
+	tya
+	sec
+	sbc #18 ; subtract header
+	cmp EmptyPatternOffset
+	beq :+
+		; Something went wrong. Our size estimate didn't match what was actually output
+		BRK
+	:
+rts
+
+.a8
+CopyCurrentSongToSpcBuffer:
+
+	phb
+	lda #^CompiledPattern
+	pha
+	plb
+
+	lda #$ff
+	sta f:PatternOffsetReferences ; $FF indicates the first empty entry, just move the $FF every time an entry is added to prevent looping through the whole thing
+	sta f:PatternOffsetReferencesAlternating ; $FF indicates the first empty entry, just move the $FF every time an entry is added to prevent looping through the whole thing
+
+	lda #32+2+2+1+2 ; 16 order references (two rows of 8 channels) + $ffff at the end + two rows looping forever + $00 $at the end + $ffff for empty macro dir
+	jsr CopySongHeaderAndCalculateOffsets
+	.a16
+	; First pattern is always empty, allows us to easily silence channels
+	jsr AddEmptyPattern
+	
 	; PATTERN REFERENCES
 	lda z:PatternIndexOffset
 	sta z:CurrentCompileIndex
@@ -467,7 +588,7 @@ CopyCurrentSongToSpcBuffer:
 	sta z:SecondRowPatternEnd
 	stz z:PatternOffsetTablePointer ; Toggle between 0, and the offset to the alternating table, on alternating rows
 	jsr CompileSongRowToBuffer
-	
+	; Y = The end of the first row of pattern reference rows
 	
 	ldy z:CurrentCompileIndex
 	lda #0
@@ -477,6 +598,8 @@ CopyCurrentSongToSpcBuffer:
 		iny
 		dex
 	bne :-
+	; Y = The end of the second row of pattern reference rows
+	
 	lda #$ffff ; End of pattern refs
 	sta CompiledPattern,Y
 	iny
@@ -489,46 +612,8 @@ CopyCurrentSongToSpcBuffer:
 	lda #0 ; End of pattern lengths
 	sta CompiledPattern,Y
 	iny
-	lda #$ffff ; Empty macro table
-	sta CompiledPattern,Y
-	iny
-	iny
 	
-	ldx #0 ; 6 hardcoded instruments so far
-	:
-;$01 ; sample
-;$FFF7 ; pitch adjust
-;$00 ; fadeout
-;$A0 ; volume
-;$0000 ; volume envelope address
-;0 ; unused
-		txa
-		ora #$0000
-		sta CompiledPattern+0,Y
-		lda #$0000
-		sta CompiledPattern+2,Y
-		lda #$00A0
-		sta CompiledPattern+4,Y
-		lda #$0000
-		sta CompiledPattern+6,Y
-		tya
-		clc
-		adc #8
-		tay
-		inx
-		cpx #6
-	bne :-
-	
-	sty CurrentCompileIndex
-	
-	tya
-	sec
-	sbc #18 ; subtract header
-	cmp EmptyPatternOffset
-	beq :+
-		; Something went wrong. Our size estimate didn't match what was actually output
-		brk
-	:
+	jsr CopyMacrosAndInstruments
 	
 	seta8
 	plb
@@ -798,11 +883,44 @@ AddEmptyPattern:
 .a16
 	sty z:EmptyPatternOffset
 	
-	lda #$80|16 ; 16 silent rows
+	lda #$80|16 ; 16 empty bars
 	sta CompiledPattern+18,Y ; Remember, when using the pattern offset, add 18 to account for header
 	iny
 	sty z:FirstRowPatternOffset ; Address after empty pattern is where all our song patterns will be added from
 rts
+
+AddSingleNotePattern:
+.a16
+	sty z:SingleNotePatternOffset
+	tya
+	clc
+	adc #18
+	sta z:SingleNotePatternOffsetInSpcSource
+	
+	lda #$0000 ; Block header: 1 bar (1 minus 1) + Blank byte for instrument data
+	sta CompiledPattern+18,Y ; Remember, when using the pattern offset, add 18 to account for header
+	iny
+	iny
+
+	lda #($80<<8)|(15<<8) ; Blank byte for note data + 15 empty bars ($80|15)
+	sta CompiledPattern+18,Y ; Remember, when using the pattern offset, add 18 to account for header
+	iny
+	iny
+rts
+
+AddSinglePhrasePattern:
+.a16
+	sty z:TestPatternOffset
+	
+	lda #$15 ; Block header: 15 bar (16 minus 1)
+	sta CompiledPattern+18,Y ; Remember, when using the pattern offset, add 18 to account for header
+	tya
+	clc
+	adc #4*16+1
+	tay
+	sty z:CurrentPatternOffset; Nothing more written after this point, but store offset to calculate size of SPC data transferred
+rts
+
 	
 .macro CopyNotesFromPhraseToCompiledPattern SOURCE
 ;+0 = instrument id, ;+1 = command id, ;+2 = command param, ;+3 = note
@@ -862,93 +980,6 @@ rtl
 
 .a8
 
-; !!!!!!!!!!!!!!!!!!!!!! TODO: Only use tiny bits of this, if any, dynamically add instruments using same code as full song and chain
 TestPatternSource:
-; Preprogrammed pattern used to test single phrase or play a single note
-
-Pattern01Offset = test_pattern_single_note - TestPatternSource
-PatternReferenceOffset = test_pattern_trackindex_start - TestPatternSource
-
-Pattern16Index = test_pattern_16_bars - test_pattern_trackindex_start
-Pattern01Index = test_pattern_single_note - test_pattern_trackindex_start
-SilentPatternIndex = test_pattern_silent - test_pattern_trackindex_start
-
 ;HEADER
 .byte $06,$50, $40,$20, $40,$20, $40,$20, $40,$20, $40,$20, $40,$20, $40,$20, $40,$20
-
-;ORDERS
-test_pattern_trackindex_start:
-.addr Pattern01Index,SilentPatternIndex,SilentPatternIndex,SilentPatternIndex,SilentPatternIndex,SilentPatternIndex,SilentPatternIndex,SilentPatternIndex
-.addr $FFFF ; ORDER LIST END
-
-;PATTERN LENGTH TABLE (number of rows per pattern)
-.byte 16
-.byte $00 ; END
-
-;MACRO DIRECTORY
-.addr $FFFF ; END
-
-;INSTRUMENTS
-.byte $00 ; sample
-.word $0000 ; pitch adjust
-.byte $00 ; fadeout
-.byte $A0 ; volume
-.addr $0000 ; volume envelope address
-.byte 0 ; unused
-
-.byte $01 ; sample
-.word $0000 ; pitch adjust
-.byte $00 ; fadeout
-.byte $A0 ; volume
-.addr $0000 ; volume envelope address
-.byte 0 ; unused
-
-.byte $02 ; sample
-.word $0000 ; pitch adjust
-.byte $00 ; fadeout
-.byte $A0 ; volume
-.addr $0000 ; volume envelope address
-.byte 0 ; unused
-
-.byte $03 ; sample
-.word $0000 ; pitch adjust
-.byte $00 ; fadeout
-.byte $A0 ; volume
-.addr $0000 ; volume envelope address
-.byte 0 ; unused
-
-.byte $04 ; sample
-.word $0000 ; pitch adjust
-.byte $00 ; fadeout
-.byte $A0 ; volume
-.addr $0000 ; volume envelope address
-.byte 0 ; unused
-
-.byte $05 ; sample
-.word $0000 ; pitch adjust
-.byte $00 ; fadeout
-.byte $A0 ; volume
-.addr $0000 ; volume envelope address
-.byte 0 ; unused
-
-;SILENT PATTERN
-test_pattern_silent: .byte $80|16 ; 16 silent rows
-
-test_pattern_single_note:
-.byte 0; Block header: 1 bar (1 minus 1)
-.byte $00 ; Insert instrument here
-.byte $00 ; Insert note here
-.byte $80|15 ; 15 silent rows
-
-;MY PATTERN
-test_pattern_16_bars:
-; Instrument 60 = cut, 61 = fase, 62 = off, 63 = nothing happens, 54-59 = macros
-.byte 15 ; Block header: Number of bars minus 1
-.res 4 * 16 ; Each bar is at most 4 bytes if command is present, so for random access we just add a "null" command to every bar
-
-;.byte $00 ; Instrument 0-52
-;.byte 12*4 ; Note byte
-;.byte 63 ; silence
-;.byte $00 ; Instrument 0-52
-;.byte 12*4+1 ; Note byte
-;.byte 63 ; silence

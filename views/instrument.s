@@ -55,7 +55,7 @@ FocusView:
 
 	Bind Input_StartPlayback, NoAction
 	Bind Input_CustomHandler, HandleInput
-	Bind Input_NavigateIn, NoAction
+	Bind Input_NavigateIn, SaveChanges
 	Bind Input_NavigateBack, NavigateBack
 	Bind OnPlaybackStopped, NoAction
 
@@ -524,7 +524,7 @@ RemoveAddedSampleIfUnused:
 		inx
 		inx
 		inx
-		cpx #53*8
+		cpx #MAX_INSTRUMENTS*8
 	bne @loop
 	@notFound: ; No instrument found using the sample. Remove it from AddedSamples
 @removedSample = 0
@@ -548,7 +548,7 @@ RemoveAddedSampleIfUnused:
 		inx
 		inx
 		inx
-		cpx #53*8
+		cpx #MAX_INSTRUMENTS*8
 	bne @loop2
 	
 	@found: ; An instrument uses the sample. Do nothing
