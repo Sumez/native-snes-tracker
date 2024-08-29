@@ -13,7 +13,7 @@
     - "Channel bar" in the top, facilitates navigating between channels using L/R buttons (probably)
     - ~~Navigate up down between sequential chains and phrases based on where in the song you are~~ <sup>Done</sup>
     - Fresh insert on song or chain view will insert the next unused index
-    - Button to copy an inserted chain or phrase to a new one (if another entry exists)
+    - Clone/deepclone inserted chains or phrases
     - Hold Delete while moving cursor to delete multiple
     - Make it visible ("greyed out"?) that a chain/phrase/instrument is "empty"/uncreated where selecting it
 - Rudimentary GUI
@@ -25,7 +25,7 @@
 - Basic tracker commands
     - Implement the ones already supported in the sound driver first - Pitch up/down, volume slide, arpeggio - loop and tempo change should be in song data instead? <sup>Partly implemented</sup>
     - ~~"Key off" entries~~ <sup>Done</sup>
-- Edit instruments in tracker <sup>Partly implemented</sup>
+- ✅ ~~Edit instruments in tracker~~ <sup>Done</sup>
 - Improved sound driver
     - Better use of keyoff/keyon control instead of manual volume
     - ADSR support on instruments
@@ -49,6 +49,7 @@
 - Hardware echo filter
 - Pitch modulation
 - Built-in sample synthesis
+- Preloaded royalty-free default samples
 - Hardware noise channel
 - Live mode
 - Pre-emphasize samples to counterbalance the SNES DSP's gaussian filter
