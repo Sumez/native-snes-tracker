@@ -6,6 +6,7 @@ using Brewsic.Playback;
 using Patcher.ViewModels;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -14,6 +15,7 @@ using System.Threading.Tasks;
 namespace Patcher;
 public partial class MainWindow : Window
 {
+	private static string[] ValidSampleFiles = new[] { ".brr", ".wav", ".mp3", ".spc", ".sfc", ".smc", ".brrp" };
 	public static int PatchedSamplesStartAddress = 0x081900; // Get this dynamically by reading from another address in file
 	public Patch Patch { get; set; }
 	public PreviewPlayer PreviewPlayer { get; set; }
@@ -25,39 +27,29 @@ public partial class MainWindow : Window
 		PreviewPlayer = new PreviewPlayer();
 		PreviewPlayer.PlaySilence();
 
-		AddBrrfile(File.OpenRead("../../../../samples/perc_snare.brr"), "perc_snare");
+//		AddBrrfile(File.OpenRead("../../../../samples/perc_snare.brr"), "perc_snare");
 //		Patch.RomFilePath = "23";
-		AddUncompressedAudio("../../../../samples/perc_snare.wav", "perc_snare");
+//		AddUncompressedAudio("../../../../samples/perc_snare.wav", "perc_snare");
 
 		DragDrop.AllowDropProperty.OverrideDefaultValue<MainWindow>(true);
 
 		SampleSources.AddHandler(DragDrop.DropEvent, SampleDrop);
-		AddHandler(DragDrop.DragOverEvent, DragOver);
+		SampleSources.AddHandler(DragDrop.DragOverEvent, (s, e) =>
+		{
+			var files = e.Data.GetFiles()?.OfType<IStorageFile>();
+			e.DragEffects = files != null && files.Any(f => ValidSampleFiles.Contains(Path.GetExtension(f.Name).ToLower())) ? DragDropEffects.Link : DragDropEffects.None;
+			e.Handled = true;
+		});
 		SampleSources.AddHandler(DragDrop.DragEnterEvent, (s, e) => SampleSources.Classes.Set("DragOver", true));
 		SampleSources.AddHandler(DragDrop.DragLeaveEvent, (s, e) => SampleSources.Classes.Set("DragOver", false));
+		AddHandler(DragDrop.DragOverEvent, DragOver);
 		AddHandler(DragDrop.DropEvent, RomDrop);
 	}
 
-	private void DragEnter(object? sender, DragEventArgs e) { e.DragEffects = DragDropEffects.Link; }
-	private void DragLeave(object? sender, DragEventArgs e) => SampleSources.Classes.Set("dragover", false);
 	private void DragOver(object? sender, DragEventArgs e)
 	{
 		var files = e.Data.GetFiles()?.OfType<IStorageFile>();
-		if (Patch.RomFilePath == null)
-		{
-			if (files == null || files.Count() != 1 || Path.GetExtension(files.First().Name).ToLower() != ".sfc")
-			{
-				e.DragEffects = DragDropEffects.None;
-			}
-			return;
-		}
-
-		if (e.Source != SampleSources) return;
-		SampleSources.Classes.Set("dragover", true);
-		if (files == null || !files.Any(f => ValidSampleFiles.Contains(Path.GetExtension(f.Name).ToLower())))
-		{
-			e.DragEffects = DragDropEffects.None;
-		}
+		if (Patch.RomFilePath != null || files == null || files.Count() != 1 || Path.GetExtension(files.First().Name).ToLower() != ".sfc") e.DragEffects = DragDropEffects.None;
 	}
 	private async void RomDrop(object? sender, DragEventArgs e)
 	{
@@ -68,6 +60,7 @@ public partial class MainWindow : Window
 	}
 	private void SampleDrop(object? sender, DragEventArgs e)
 	{
+		SampleSources.Classes.Set("DragOver", false);
 		var files = e.Data.GetFiles()?.OfType<IStorageFile>();
 		if (files != null && files.Any(f => ValidSampleFiles.Contains(Path.GetExtension(f.Name).ToLower()))) AddSampleFiles(files);
 	}
@@ -157,6 +150,12 @@ public partial class MainWindow : Window
 		Patch.RomFilePath = file.Path.LocalPath;
 		await using var stream = await file.OpenReadAsync();
 		stream.Position = PatchedSamplesStartAddress;
+		SetSamplesFromStream(stream);
+	}
+
+	private void SetSamplesFromStream(Stream stream)
+	{
+		Patch.AvailableSamples.Clear();
 		SampleFile? extractedSample;
 		do
 		{
@@ -195,8 +194,6 @@ public partial class MainWindow : Window
 		await AddSampleFiles(files);
 	}
 
-	private static string[] ValidSampleFiles = new[] { ".brr", ".wav", ".mp3", ".spc", ".sfc", ".smc" };
-
 	private async Task AddSampleFiles(IEnumerable<IStorageFile> files)
 	{
 		foreach (var file in files) await AddSampleFile(file);
@@ -223,8 +220,12 @@ public partial class MainWindow : Window
 			case ".mp3":
 				AddUncompressedAudio(file.Path.LocalPath, name);
 				break;
+			case ".brrp":
+				AddSamplePack(stream);
+				break;
 		}
 	}
+	private void AddSamplePack(Stream stream) => SetSamplesFromStream(stream);
 
 	private async Task ParseSpcDump(Stream stream, string name)
 	{
