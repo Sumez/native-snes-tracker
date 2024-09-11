@@ -1,7 +1,7 @@
 .include "global.inc"
 .include "src/snes.inc"
 .smart
-.import PlaySinglePhrase, PrepareTestPatternPlayback, StopPlayback, SwitchToSingleNoteMode, TransferSingleNoteToSpcAndPlay
+.import PlaySinglePhrase, PrepareTestPatternPlayback, StopPlayback, SwitchToSingleNoteMode, PlaySingleNote
 .import UpdateNoteInPlayback, NoteDataOffsetInPhrase
 
 .segment "CODE7"
@@ -53,7 +53,7 @@ rtl
 FocusView:
 	jsr LoadView
 
-	jsl PreparePlayback_long
+	jsl PrepareTestPatternPlayback
 	ldy #.loword(Name)
 	jsl WriteTilemapHeader
 	lda CurrentPhraseIndex
@@ -247,13 +247,13 @@ InitiateNoteTileReferences:
 	sta Notes+10
 	lda #$01
 	sta Notes+11
-	lda #$1C ; #
+	lda #'#'
 	sta NotesSharp+1
 	sta NotesSharp+3
 	sta NotesSharp+6
 	sta NotesSharp+8
 	sta NotesSharp+10
-	lda #$3B ; -
+	lda #'-'
 	sta NotesSharp+0
 	sta NotesSharp+2
 	sta NotesSharp+4
@@ -412,6 +412,13 @@ rtl
 CommandCharacter:
 .byte 0,"TxXSpPVXxA"
 
+.export Pattern_GetCurrentNote = GetCurrentNote
+GetCurrentNote:
+	ldx CursorPositionRow
+	lda PatternNotes,x
+rts
+
+
 .segment "CODE7"
 
 NoteWasChanged:
@@ -444,8 +451,12 @@ PlayCurrentNote:
 	lda IsPlaying
 	bne :+ ; If currently playing, just don't do anything
 		jsr CutCurrentlyPlayingNote
-		jsr CompileCurrentNoteToBuffer
-		jsr TransferSingleNoteToSpcAndPlay
+		
+		ldy CursorPositionRow
+		lda PatternInstruments,Y
+		xba
+		lda PatternNotes,Y
+		jmp PlaySingleNote
 	:
 rts
 CutCurrentlyPlayingNote:
@@ -598,7 +609,7 @@ HandleInput:
 	bne @EditModeInstrumentCol
 
 ; TODO: Make this a lot simpler. Maybe use an indirect jump depending on which column is active?
-@EditModeNodeCol:
+@EditModeNoteCol:
 	bit #>KEY_DOWN
 	beq :+
 		lda #(256-12)
@@ -887,21 +898,6 @@ ShowCursor:
 	
 	lda #2
 jmp UpdateCursorSpriteAndHighlight
-
-PreparePlayback_long: jsr PrepareTestPatternPlayback
-rtl
-
-; TODO: Separate and move to playback.s
-CompileCurrentNoteToBuffer:
-	ldx z:SingleNotePatternOffsetInSpcSource
-	ldy CursorPositionRow
-	
-	lda PatternInstruments,Y
-	sta f:CompiledPattern+1,X
-	
-	lda PatternNotes,Y
-	sta f:CompiledPattern+2,X
-rts
 
 StartPlayback:
 	lda CurrentPhraseIndex

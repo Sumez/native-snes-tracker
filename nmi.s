@@ -45,9 +45,15 @@ stz NMITEST
 
 
 
-.import CopyEntireTilemap, CopyTilemapToUiLayer
+.import CopyEntireTilemap, CopyTilemapToUiLayer, CopyGuiTilemap, UpdateGui
 jsl CopyEntireTilemap ; TODO: just queue updated rows?
-jsl CopyTilemapToUiLayer
+lda UpdateGui
+beq :+
+	jsl CopyGuiTilemap
+	bra :++
+:
+	jsl CopyTilemapToUiLayer
+:
 
 	jsr Vfx_Update_Vblank
 
@@ -60,6 +66,9 @@ jsl CopyTilemapToUiLayer
 ;	.import CopySpriteGraphics
 ;	jsr CopySpriteGraphics
 
+lda #$ff
+sta BG1SCROLLY
+stz BG1SCROLLY
 
 lda ScrollY
 sta BG2SCROLLY

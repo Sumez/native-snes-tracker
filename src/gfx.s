@@ -8,6 +8,8 @@ PatternPaletteHighlight:
 .incbin "gfx/font.inc.1.pal"
 PatternPaletteDim:
 .incbin "gfx/font.inc.2.pal"
+GuiPalette:
+.incbin "gfx/gui.inc.0.pal"
 
 
 .export LoadVRAM, LoadOAM
@@ -166,6 +168,11 @@ LoadPalettes:
 	lda #$10 ; 10, 20, etc
 	ldx #$20
 	ldy #.loword(PatternPaletteHighlight)
+	jsr loadPalette
+
+	lda #$20 ; 10, 20, etc
+	ldx #$20
+	ldy #.loword(GuiPalette)
 	jsr loadPalette
 
 	lda #$80 ; 10, 20, etc

@@ -3,16 +3,18 @@
 .smart
 
 .importzp BrewsicTransferDestination
-.import BrewsicPlayTrack, BrewsicTransfer, BrewsicPlaySound, BrewsicStopTrack
+.import BrewsicPlayTrack, BrewsicTransfer, BrewsicPlaySound, BrewsicStopTrack, SampleDirectoryAddress
 .import Song_UpdateHighlight, Chain_UpdateHighlight, Pattern_UpdateBeatHighlight
+.import Instrument_OnSampleTransferDone, Instrument_CurrentSampleLoopOffset
 .import AddedSamples, SampleDirectory
 
 .export Playback_Update = Update
 .export PrepareTestPatternPlayback, UpdateNoteInPlayback, NoteDataOffsetInPhrase
 .export PlaySinglePhrase, PlaySingleChain
 .export StopPlayback
-.export SwitchToSingleNoteMode, TransferSingleNoteToSpcAndPlay
+.export SwitchToSingleNoteMode, PlaySingleNote
 
+.export FragmentedRemainingBytes
 
 PatternReferenceOffset = 18 ; Pattern references always start 18 bytes into data
 
@@ -32,6 +34,13 @@ Playback_CurrentPhraseOfChannel: .res 8 ; Keep this in memory until bar 0 of the
 ;Playback_CurrentChainRowOfChannel: .res 8
 Playback_CurrentSongRowOfChannel = SongRowOfChannel
 
+FragmentedWritePosition: .res 2
+FragmentedRemainingBytes: .res 2
+FragmentAddress: .res 4 ; 3 byte address, but 1 byte overhead to allow for simple INC instruction
+TestSamplePosition: .res 2
+TestInstrument: .res 8
+TestSample: .res 4
+
 .segment "ZEROPAGE"
 PatternToFind: .res 2
 BarCounter = PatternToFind ; Reuse this variable since the two routines always run in sequence and will never conflict
@@ -45,6 +54,7 @@ FirstRowPatternOffset: .res 2
 SecondRowPatternOffset: .res 2
 SecondRowPatternEnd: .res 2
 PatternIndexOffset: .res 2
+InstrumentDataOffset: .res 2
 
 SongRowOfChannel: .res $10
 ChainOffsetOfChannel: .res $10 ; row that will be read when NEXT phrase starts
@@ -56,6 +66,8 @@ PatternOffsetTablePointer: .res 2
 
 Update:
 @barsRemaining = 0
+
+	jsr TransferFragment ; Transfer next fragment is any is queued
 
 	lda IsPlaying
 	beq @return
@@ -110,18 +122,17 @@ Update:
 	@return:
 rts
 
-
 PrepareTestPatternPlayback:
 	; Prepare a dummy test pattern so we can initiate a single note playing as quickly as possible
 	lda IsPlaying
 	sta QueuePreparePlayback ; If playing, don't prepare now, but enqueue until current playback ended to avoid conflicting with it
 	beq :+
-		rts
+		rtl
 	:
 	
 	jsl CompileTestPattern
 	jsr TransferEntirePlaybackBufferToSpc
-rts
+rtl
 
 PlaySinglePhrase:
 	phx
@@ -182,11 +193,18 @@ PlaySingleChain:
 	jsl CopyCurrentSongToSpcBuffer
 jmp TransferEntirePlaybackBufferToSpcAndPlay
 
+PlaySingleNote: ; A = Note, B = Instrument
+	ldx z:SingleNotePatternOffsetInSpcSource
+	sta f:CompiledPattern+2,X
+	xba
+	sta f:CompiledPattern+1,X
+jmp TransferSingleNoteToSpcAndPlay
+
 SwitchToSingleNoteMode:
 
 	;lda QueuePreparePlayback
 	;beq :+
-		jsr PrepareTestPatternPlayback ; Always prepare test pattern playback because full song could have been playing
+		jsl PrepareTestPatternPlayback ; Always prepare test pattern playback because full song could have been playing
 	;:
 
 	; Switch to playing single note pattern
@@ -298,6 +316,8 @@ jmp spcTransfer
 spcTransfer:
 	
 	seta16
+	;stz FragmentedRemainingBytes ; Exit any fragmented transfer if one is in progress (shouldn't happen)
+	
 	txa
 	clc
 	adc TrackDataAddressInSpc
@@ -319,7 +339,130 @@ spcTransfer:
 	sta PPUNMI
 rts
 
+PointInstrumentToTestSample:
 
+	; UPDATE INSTRUMENT DATA
+	stz TestInstrument+0 ; Sample #0
+	stx TestInstrument+1 ; Pitch adjust from caller
+	stz TestInstrument+3 ; Fadeout: 0
+	sty TestInstrument+4 ; Volume from caller
+	stz TestInstrument+5 ; Volume envelope: 0
+	stz TestInstrument+6 ; Volume envelope: 0
+	stz TestInstrument+7 ; Unused
+	seta16
+	and #$00ff
+	asl
+	asl
+	asl
+	adc InstrumentDataOffset
+	adc TrackDataAddressInSpc
+	sta z:BrewsicTransferDestination
+	seta8
+	
+	lda #^TestInstrument
+	ldx #.loword(TestInstrument)
+	ldy #8
+
+	stz PPUNMI
+	jsr BrewsicTransfer ; Transfers instrument data
+
+	; UPDATE SAMPLE DIRECTORY
+	seta16
+	lda TestSamplePosition
+	sta TestSample+0
+	clc
+	adc Instrument_CurrentSampleLoopOffset
+	sta TestSample+2
+	seta8
+
+	ldx #SampleDirectoryAddress
+	stx z:BrewsicTransferDestination ; Insert test sample reference as the first entry in sample directory
+	lda #^TestSample
+	ldx #.loword(TestSample)
+	ldy #4 ; Fortunately one sample directory entry is exactly 4 bytes
+	jsr BrewsicTransfer ; Transfers sample directory entry
+
+	lda #VBLANK_NMI|AUTOREAD
+	sta PPUNMI
+rts
+
+BeginFragmentedTransfer:
+	sta FragmentAddress+2
+	stx FragmentAddress+0
+	seta16
+	clc
+	lda CurrentPatternOffset
+	;adc #18
+	adc #20 ; TODO: Find out what the extra two bytes are?!
+	adc TrackDataAddressInSpc
+	sta FragmentedWritePosition
+	sta TestSamplePosition
+	sty FragmentedRemainingBytes
+	tya
+	clc
+	adc TestSamplePosition
+	seta8
+	bcc :+
+		; If size + start position sets the carry flag, sample is too large to transfer
+		; TODO: Let the user know why we're not playing anything
+		ldy #0
+		sty FragmentedRemainingBytes
+		rts
+	:
+	jsr StopPlayback
+;jmp TransferFragment ; used too many cycles to do everything at once
+rts
+TransferFragment:
+	ldx FragmentedRemainingBytes
+	bne :+
+rts
+	:
+	seta16
+	lda FragmentedWritePosition
+	sta z:BrewsicTransferDestination
+
+	@fragmentSize = 700
+	lda FragmentedRemainingBytes
+	cmp #@fragmentSize
+	bcc :+
+		sec
+		sbc #@fragmentSize
+		sta FragmentedRemainingBytes
+		lda #@fragmentSize
+		bra :++
+	:
+		stz FragmentedRemainingBytes
+	:
+	pha ; We'll need this later
+	tay
+
+	clc
+	adc FragmentedWritePosition
+	sta FragmentedWritePosition
+	
+	seta8
+	ldx FragmentAddress
+	lda FragmentAddress+2
+
+	stz PPUNMI
+	jsr BrewsicTransfer
+	lda #VBLANK_NMI|AUTOREAD
+	sta PPUNMI
+	
+	seta16
+	pla
+	clc
+	adc FragmentAddress
+	sta FragmentAddress
+	bcc :+
+		inc FragmentAddress+2
+	:
+	lda FragmentedRemainingBytes
+	seta8
+	bne :+
+		jsr Instrument_OnSampleTransferDone
+	:
+rts
 UpdateNoteInPlayback: ; !!! Needs to preserve [X] into CompileSingleNoteBar
 
 	sta PatternToFind
@@ -498,6 +641,8 @@ CopyMacrosAndInstruments:
 	sta CompiledPattern,Y
 	iny
 	iny
+	tya
+	sta f:InstrumentDataOffset
 	
 	ldx #0
 	:
@@ -514,7 +659,9 @@ CopyMacrosAndInstruments:
 		beq @breakInstrumentLoop
 		
 		phx
+		inc a ; Samples start at index #1 to make room for test sample/sound effects
 		sta CompiledPattern+0,Y
+		dec a
 		asl
 		tax
 		lda f:AddedSamples,X
@@ -982,4 +1129,4 @@ rtl
 
 TestPatternSource:
 ;HEADER
-.byte $06,$50, $40,$20, $40,$20, $40,$20, $40,$20, $40,$20, $40,$20, $40,$20, $40,$20
+.byte $06,$50, $7F,$20, $7F,$20, $7F,$20, $7F,$20, $7F,$20, $7F,$20, $7F,$20, $7F,$20

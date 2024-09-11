@@ -7,7 +7,6 @@ Name: .byte "Song",$ff
 
 .segment "BSS"
 
-SongTilesBuffer = TilemapBuffer + $100
 ChainIndexes = SONG
 
 CursorPosition: .res 2
@@ -49,6 +48,8 @@ LoadView:
 	ldx z:LoadView_TilemapOffset
 	stx TilemapOffset
 	jsl WriteTilemapBuffer
+	ldx #0
+	jsl LoadGuiMap
 rts
 
 WriteTilemapBuffer:
@@ -58,7 +59,7 @@ WriteTilemapBuffer:
 	pha
 	plb
 	ldy #0
-	ldx #8
+	ldx TilemapOffset
 	@colLoop:
 		
 		@rowLoop:
@@ -73,18 +74,18 @@ WriteTilemapBuffer:
 				lsr
 				lsr
 				ora #$40
-				sta f:SongTilesBuffer,x
+				sta f:TilemapBuffer,x
 				pla
 				and #$0F
 				ora #$40
-				sta f:SongTilesBuffer+2,x
+				sta f:TilemapBuffer+2,x
 				bra :++
 			:
 				; Empty cell	
 				lda #$1d
-				sta f:SongTilesBuffer,x
+				sta f:TilemapBuffer,x
 				lda #$1f
-				sta f:SongTilesBuffer+2,x
+				sta f:TilemapBuffer+2,x
 			:
 			seta16
 			txa

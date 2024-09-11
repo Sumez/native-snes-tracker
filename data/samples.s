@@ -24,6 +24,8 @@
 .export SAMPLE_DATA
 SAMPLE_DATA:
 .align $100
+.incbin "bin/samples2.brrp"
+;.incbin "bin/rgsh.brrp"
 AddSample "Sample_0", "music/sample0.brr"
 AddSample "Sample_1", "music/sample1.brr"
 AddSample "Sample_2", "music/sample2.brr"

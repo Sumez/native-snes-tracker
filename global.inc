@@ -6,11 +6,16 @@ MAX_INSTRUMENTS = 53
 .define TilemapBufferSegment "BSS7E"
 .define CompiledPlaybackDataSegment "BSS7F"
 
+;Sort this out
+.global LoadGuiMap
+
+
 ; Memory addresses
 .global SONG, CHAINS, PHRASES_1, PHRASES_2, INSTRUMENTS, SAMPLES
 .globalzp Input_CustomHandler, Input_NavigateIn, Input_NavigateBack, Input_MoveLeft, Input_MoveUp, Input_MoveRight, Input_MoveDown
 .globalzp Input_StartPlayback, OnPlaybackStopped
-.global CurrentScreen, IsPlaying, CompiledPattern, TilemapBuffer, UiTilemapBuffer, EditMode
+.global CurrentScreen, IsPlaying, CompiledPattern, TilemapBuffer, GuiTilemapBuffer, UiTilemapBuffer, EditMode
+.global Notes, Octaves, NotesSharp
 .globalzp SingleNotePatternOffsetInSpcSource ; Unsure about these
 
 ; Temp variables
@@ -24,6 +29,7 @@ LoadView_TilemapOffset = 0
 .global Playback_CurrentBeatRow, Playback_CurrentPhraseOfChannel
 .globalzp Playback_CurrentChainOffsetOfChannel, Playback_CurrentSongRowOfChannel
 .global TrackDataAddressInSpc
+.global BeginFragmentedTransfer, PointInstrumentToTestSample
 
 ; Cursor stuff
 .global CursorOffset, CursorX, CursorY, CursorSize, UpdateCursorSpriteAndHighlight, HighlightLength
@@ -81,7 +87,7 @@ LoadView_TilemapOffset = 0
 .global AddBigSprite, AddWideSprite, AddSmallSprite, ResetSprites, FinalizeSprites, CleanOamBuffer
 .globalzp SpritePalette, SpriteSize
 
-.global HdmaRoutine, ButtonStates, ButtonPushed, ColorBlend
+.global HdmaRoutine, ButtonStates, ButtonPushed, ButtonPushed_Actual, ColorBlend
 .global LoadVRAM, LoadMode7TileMap, ClearRange, ResetRange
 
 ; Stage data
@@ -114,7 +120,7 @@ State_Landing = %00100000
 State_Dead = %11111111
 
 SpriteChrBase = $4000
-Bg1TileMapBase = $1000 ; -$2000 ; Should be an "even" number, so we cna easily "and" the address pointer
+Bg1TileMapBase = $0000 ; -$2000 ; Should be an "even" number, so we cna easily "and" the address pointer
 Bg2TileMapBase = $8000 ; -$6800
 Bg3TileMapBase = $f000 ; -$6800
 Bg1ChrBase = $2000
@@ -287,6 +293,7 @@ Bg4ChrBase = $0000
 .charmap 'z',$39
 .charmap '.',$3a
 .charmap '-',$3b
+.charmap '+',$3c
 .charmap '~',$3e
 .charmap '_',$3f ; Space
 

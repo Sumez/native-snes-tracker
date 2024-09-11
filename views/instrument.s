@@ -2,6 +2,8 @@
 .include "src/snes.inc"
 .smart
 .import AddedSamples, SampleDirectory
+.import Pattern_GetCurrentNote
+.import StopPlayback, PrepareTestPatternPlayback, SwitchToSingleNoteMode, PlaySingleNote
 
 .segment "CODE7"
 Name_Existing: .byte "Instrument____-_no_name",$ff
@@ -24,9 +26,21 @@ SampleDirectoryIndex: .res 2
 PreviousAddedSampleIndex: .res 2
 TilemapOffset: .res 2
 WasChanged: .res 1
-PitchAdjust: .res 2
 CustomPitchAdjust: .res 2
-Volume: .res 1
+Volume: .res 2
+TestNote: .res 1
+
+.export Instrument_CurrentSampleLoopOffset = CurrentSampleLoopOffset
+CurrentSampleSize: .res 2
+CurrentSamplePitchAdjust: .res 2
+CurrentSampleLoopOffset: .res 2
+CurrentSampleDataAddress: .res 3
+
+IsTransfering: .res 1
+BufferPreviewSound: .res 1
+
+.segment "ZEROPAGE"
+CurrentSampleAddress: .res 3
 
 .segment "CODE6"
 
@@ -38,6 +52,10 @@ rtl
 .import Samples_PrepareSampleEdit
 FocusView:
 	jsr LoadView
+	stz IsTransfering
+	stz BufferPreviewSound
+	jsl PrepareTestPatternPlayback
+	jsl BufferSamplePlayback
 	jsl Samples_PrepareSampleEdit
 	
 	ldy #.loword(Name_New)
@@ -48,16 +66,16 @@ FocusView:
 	beq :+
 		ldy #.loword(Name_Existing)
 		jsl WriteTilemapHeader
-		ldx #$9E
+		ldx #$9E+$40
 		lda CurrentInstrumentIndex
 		jsl WriteTilemapHeaderId
 	:
 
 	Bind Input_StartPlayback, NoAction
 	Bind Input_CustomHandler, HandleInput
-	Bind Input_NavigateIn, SaveChanges
-	Bind Input_NavigateBack, NavigateBack
-	Bind OnPlaybackStopped, NoAction
+	Bind Input_NavigateIn, NoAction
+	Bind Input_NavigateBack, SaveChanges
+	Bind OnPlaybackStopped, SwitchToSingleNoteMode
 
 	stz CursorPosition
 	jsl ShowCursor_long
@@ -70,9 +88,12 @@ seta16
 	sta TilemapOffset
 	
 	stz CustomPitchAdjust
-	lda #$20
-	sta Volume
 seta8
+	lda #$50
+	sta Volume
+	jsr Pattern_GetCurrentNote
+	sta TestNote
+	
 	tya
 	cmp #$ff
 	beq :++
@@ -108,6 +129,9 @@ seta8
 	stz WasChanged
 	jsl WriteBaseTilemapBuffer
 	jsl UpdateTilemapBuffer
+	
+	ldx #4
+	jsl LoadGuiMap
 rts
 
 WriteBaseTilemapBuffer:
@@ -117,40 +141,32 @@ WriteBaseTilemapBuffer:
 	pha
 	plb
 
-	seta16
-	lda TilemapOffset
-	clc
-	adc #$8A
-	tay
-	seta8
-	ldx #Text_PitchAdjust
-	jsr PrintText
-
-	seta16
-	lda TilemapOffset
-	clc
-	adc #$10A
-	tay
-	seta8
-	ldx #Text_Volume
-	jsr PrintText
 	
-	seta16
-	lda TilemapOffset
-	clc
-	adc #$206
-	tay
-	seta8
-	ldx #Text_SaveChanges
-	jsr PrintText
-	
+	ldx #0
+	:
+		phx
+		seta16
+		lda f:MenuLines,X
+		clc
+		adc TilemapOffset
+		tay
+		lda f:MenuItems,X
+		tax
+		seta8
+		jsr PrintText
+		plx
+		inx
+		inx
+		cpx #NumberOfMenuItems*2
+	bne :-
 	plb
 rtl
 
 SelectSampleText: .byte "Select_sample_",$ff
 UpdateTilemapBuffer:
 .assert ^TilemapBuffer = ^SampleDirectory, error
-@sampleData = 0
+Tilemap_SampleName = TilemapBuffer+MenuOffset0
+Tilemap_TestNote = TilemapBuffer+MenuOffset1
 
 	phb
 	lda #^TilemapBuffer
@@ -161,54 +177,54 @@ UpdateTilemapBuffer:
 	cpx #$ffff
 	bne :+
 		lda #^SelectSampleText
-		sta z:@sampleData+2
+		sta z:CurrentSampleAddress+2
 		ldx #.loword(SelectSampleText)
-		stx z:@sampleData
+		stx z:CurrentSampleAddress
 
 		ldx TilemapOffset
 		lda #$1D
-		sta TilemapBuffer+2,X
+		sta Tilemap_SampleName+2,X
 		lda #$1F
-		sta TilemapBuffer+4,X
+		sta Tilemap_SampleName+4,X
+		
+		jsr PrintSampleName ; Print "select sample"
 
 		bra:++
 	:
 		lda SampleDirectory,X
-		sta @sampleData
+		sta z:CurrentSampleAddress
 		lda SampleDirectory+1,X
-		sta @sampleData+1
+		sta z:CurrentSampleAddress+1
 		lda SampleDirectory+2,X
-		sta @sampleData+2
+		sta z:CurrentSampleAddress+2
 
 		ldx TilemapOffset
 		lda #'_'
-		sta TilemapBuffer+2,X
-		sta TilemapBuffer+4,X
-	:
-	ldy #0 ; Loop through sample name
-	@nameLoop:
-		lda [@sampleData],Y
-		cmp #$ff
-		beq :+
+		sta Tilemap_SampleName+2,X
+		sta Tilemap_SampleName+4,X
 		
-		sta TilemapBuffer+10,X
-		inx
-		inx
-		iny
-		cpy #14 ; Max name length
-	bne @nameLoop
+		jsr PrintSampleName
 	:
-	lda #'_'
-	:	sta TilemapBuffer+10,X
-		inx
-		inx
-		iny
-		cpy #15 ; Max name length+1
-	bne :-
 	
 	ldx TilemapOffset
-	lda CustomPitchAdjust+0
-	PrintHexNumber TilemapBuffer+2+$80
+	seta16
+	lda CustomPitchAdjust
+	lsr
+	lsr
+	lsr
+	lsr
+	lsr
+	lsr ; Divide by 64 (64 pitch adjustments = one semitone)
+	seta8
+	PrintHexNumber TilemapBuffer+2+MenuOffset3
+	lda #'+'
+	sta TilemapBuffer+MenuOffset3,X
+	lda CustomPitchAdjust+1
+	and #63
+	PrintHexNumber TilemapBuffer+2+MenuOffset4
+	lda #'+'
+	sta TilemapBuffer+MenuOffset4,X
+
 	ldy #'_'
 	lda Volume
 	bpl :+
@@ -216,30 +232,59 @@ UpdateTilemapBuffer:
 		eor #$ff
 		adc #1
 	:
-	PrintHexNumber TilemapBuffer+2+$100
+	PrintHexNumber TilemapBuffer+2+MenuOffset2
 	tya
-	sta TilemapBuffer+0+$100,X
+	sta TilemapBuffer+0+MenuOffset2,X
 	
+	lda #0
+	xba
+	lda TestNote
+	ldy #0
+	sec
+	:
+		sbc #12
+		bcc :+
+			iny
+			bra :-
+	:
+	adc #12
+	pha
+	lda Octaves,Y
+	sta Tilemap_TestNote+4,x
+	pla
+	tay
+	lda Notes,Y
+	sta Tilemap_TestNote+0,x
+	lda NotesSharp,Y
+	sta Tilemap_TestNote+2,x
 	
-	; "Save changes" palette:
-	ldx #$00
-	lda WasChanged
-	bne :+
-		;ldx #2<<2 ; TODO: Dim line palette
-	:
-	txa
-	ldx #16
-	ldy TilemapOffset
-	:
-		sta TilemapBuffer+$207,Y
-		iny
-		iny
-		dex
-	bne :-
-
 	
 	plb
 rtl
+
+PrintSampleName:
+	ldy #0 ; Loop through sample name
+	@nameLoop:
+		lda [CurrentSampleAddress],Y
+		cmp #$ff
+		beq :+
+		
+		sta Tilemap_SampleName,X
+		inx
+		inx
+		iny
+		cpy #14 ; Max name length
+	bne @nameLoop
+	:
+	lda #'_'
+	@padEndLoop:
+		sta Tilemap_SampleName,X
+		inx
+		inx
+		iny
+		cpy #15 ; Max name length+1
+	bne @padEndLoop
+rts
 
 PrintText:
 @loop:
@@ -248,22 +293,101 @@ PrintText:
 	bne :+
 		rts
 	:
-	sta TilemapBuffer,Y
+	sta TilemapBuffer+10,Y
+	lda #$20
+	sta TilemapBuffer+11,Y
 	iny
 	iny
 	inx
 bra @loop
 
-Text:
-Text_PitchAdjust = * - Text
-.byte "Pitch_adjust",$ff
-Text_Volume = * - Text
-.byte "Volume",$ff
-Text_SaveChanges = * - Text
-.byte "OK__Save_changes",$ff
-
 
 .segment "CODE7"
+
+.import Samples_IsSampleAdded
+BufferSamplePlayback:
+	ldx SampleDirectoryIndex
+	cpx #$ffff
+	bne :+
+		rtl
+	:
+	; TODO: If sample is aleady Added to song/SPC memory, just use that sample instead of transfering anything
+	; Should prevent issues with too large samples getting added twice
+	;seta16
+	;txa
+	;jsr Samples_IsSampleAdded
+	;beq :+
+	;	jsr UseExistingSampleInsteadOfTestSampleOrWhatever
+	;	jsr UpdateTestInstrument
+	;:
+	;seta8
+
+	ldy #0
+	@nameLoop:
+		lda [CurrentSampleAddress],Y
+		iny
+		inc a
+	bne @nameLoop
+	
+	seta16
+	lda [CurrentSampleAddress],Y
+	sta CurrentSampleSize
+	iny
+	iny
+	lda [CurrentSampleAddress],Y
+	sta CurrentSamplePitchAdjust
+	iny
+	iny
+	lda [CurrentSampleAddress],Y
+	sta CurrentSampleLoopOffset
+	iny
+	iny
+	
+	tya
+	clc
+	adc CurrentSampleAddress
+	tax
+	seta8
+	lda #0
+	adc CurrentSampleAddress+2
+	stx CurrentSampleDataAddress
+	sta CurrentSampleDataAddress+2
+	
+	; !!!!!!!!!!!!!!!!!! IMPORTANT: TODO: Either buffer transfer until current playback stopped, or find a way to seamlessly change sample ref during playback !!!!!!
+	ldy CurrentSampleSize
+	jsr BeginFragmentedTransfer
+
+	jsr UpdateTestInstrument
+	lda #1
+	sta IsTransfering
+rtl
+
+.export Instrument_OnSampleTransferDone = OnSampleTransferDone
+OnSampleTransferDone:
+	stz IsTransfering
+;	lda BufferPreviewSound
+;	beq :+
+;		jmp PreviewInstrument
+;	:
+rts
+
+UpdateTestInstrument:
+	ldx SampleDirectoryIndex
+	inx
+	bne :+
+		rts
+	:
+	seta16
+	lda CurrentSamplePitchAdjust
+	clc
+	adc CustomPitchAdjust
+	tax
+	lda Volume
+	and #$00ff
+	tay
+	seta8
+	lda CurrentInstrumentIndex
+jmp PointInstrumentToTestSample
 
 NoAction: rts
 ShowCursor_long: jsr ShowCursor
@@ -277,44 +401,113 @@ ShowCursor:
 	lda CursorPosition
 	tax
 	
-	lda #20
+	lda #24
 	sta HighlightLength
 
-	ldy #1
-	cpx #3
-	bne :+
-		ldy #3
-	:
-	tya
-	sta CursorX
+	stz CursorX
 	
 	lda CursorYOffsets,X
 	sta CursorY
 
-	lda CursorSizes,X
+	;lda CursorSizes,X
+	lda #1
 	sta CursorSize
 
 	lda #0
 jmp UpdateCursorSpriteAndHighlight
+
+
+Text:
+Text_Empty = * - Text
+.byte $ff
+Text_TestInstrument = * - Text
+.byte "Test_note",$ff
+Text_PitchAdjust = * - Text
+.byte "Shift_semitone",$ff
+Text_FineTune = * - Text
+.byte "Fine-tune_pitch",$ff
+Text_Volume = * - Text
+.byte "Volume",$ff
+
+
+NumberOfMenuItems = 5
+
+MenuRow0 = 0
+MenuRow1 = 3
+MenuRow2 = 6
+MenuRow3 = 8
+MenuRow4 = 9
+
+MenuOffset0 = MenuRow0*$40
+MenuOffset1 = MenuRow1*$40
+MenuOffset2 = MenuRow2*$40
+MenuOffset3 = MenuRow3*$40
+MenuOffset4 = MenuRow4*$40
+
+MenuItems:
+.addr Text_Empty, Text_TestInstrument, Text_Volume, Text_PitchAdjust, Text_FineTune
+MenuLines:
+.addr MenuOffset0,MenuOffset1,MenuOffset2,MenuOffset3,MenuOffset4
 CursorYOffsets:
-.byte 0,2,4,8
-CursorSizes:
-.byte 0,0,0,0
+.byte MenuRow0,MenuRow1,MenuRow2,MenuRow3,MenuRow4
+
+PreviewInstrument:
+	stz BufferPreviewSound
+	ldx SampleDirectoryIndex
+	inx
+	bne :+ ; If current sample = $ffff, don't do anything
+		rts
+	:
+	lda IsPlaying
+	beq :+ ; If currently playing, just don't do anything
+		rts
+	:
+	lda IsTransfering
+	beq :+ ; If transfering sample data, buffer until done
+		sta BufferPreviewSound
+		rts
+	:
+	jsr CutCurrentlyPlayingNote
+	lda CurrentInstrumentIndex
+	xba
+	lda TestNote
+jmp PlaySingleNote
+CutCurrentlyPlayingNote:
+	lda IsPlaying
+	bne :+ ; If currently playing pattern, chain or song, just don't do anything
+		jsr StopPlayback
+	:
+rts
 
 HandleInput:
 	jsr @handleInput
-jmp ShowCursor
+	
+	lda IsTransfering
+	bne :+
+	lda BufferPreviewSound
+	beq :+
+		jmp PreviewInstrument
+	:
+rts
 
 @handleInput:
+
 	lda ButtonStates+1
 	bit #>KEY_Y
 	beq :+
-		lda #1
-		bra :++
+		lda EditMode
+		bne @EditMode
+			jsr PreviewInstrument
+			lda #1
+			bra :++
 	:
-		lda #0
+		lda EditMode
+		beq @Navigation
+			jsr CutCurrentlyPlayingNote
+			lda #0
 	:
 	sta EditMode
+	jsr ShowCursor
 	beq @Navigation
 
 @EditMode:
@@ -333,6 +526,32 @@ jmp ShowCursor
 		:
 		rts
 	@afterSample:
+	cmp #1
+	bne @afterTestNote
+		; Alter test note
+		lda ButtonPushed+1
+		bit #>KEY_LEFT
+		beq :+
+			lda #$ff
+			jmp ChangeTestNote
+		:
+		bit #>KEY_RIGHT
+		beq :+
+			lda #$01
+			jmp ChangeTestNote
+		:
+		bit #>KEY_DOWN
+		beq :+
+			lda #($100-12)
+			jmp ChangeTestNote
+		:
+		bit #>KEY_UP
+		beq :+
+			lda #12
+			jmp ChangeTestNote
+		:
+		rts
+	@afterTestNote:
 	cmp #2
 	bne @afterVolume
 		; Select sample
@@ -359,16 +578,6 @@ jmp ShowCursor
 		:
 		rts
 	@afterVolume:
-
-	cmp #3
-	bne @afterSave
-
-		lda ButtonPushed+1
-		bit #>KEY_Y
-		beq @afterSave
-			jmp SaveChanges
-
-	@afterSave:
 rts
 @Navigation:
 
@@ -381,24 +590,47 @@ rts
 	beq :+
 		jmp MoveCursorUp
 	:
-
-jmp ShowCursor
+rts
 
 MoveCursorDown:
 	lda CursorPosition
 	inc
-	cmp #4
-	bcs :+
-		sta CursorPosition
+	cmp #NumberOfMenuItems
+	bcc :++
+		lda ButtonPushed_Actual+1
+		bit #>KEY_DOWN
+		bne :+
+			rts
+		:
+		lda #0
 	:
+	sta CursorPosition
 jmp ShowCursor
 
 MoveCursorUp:
 	lda CursorPosition
-	beq :+
-		dec CursorPosition
+	bne :++
+		lda ButtonPushed_Actual+1
+		bit #>KEY_UP
+		bne :+
+			rts
+		:
+		lda #NumberOfMenuItems
+		sta CursorPosition
 	:
+	dec CursorPosition
 jmp ShowCursor
+
+ChangeTestNote:
+	clc
+	adc TestNote
+	bmi :+
+	cmp #12*9
+	bcs :+
+		sta TestNote
+		jsl UpdateTilemapBuffer
+	:
+jmp PreviewInstrument
 
 ChangeVolume:
 	clc
@@ -419,7 +651,8 @@ ChangeVolume:
 	sta WasChanged
 
 	jsl UpdateTilemapBuffer
-rts
+	jsr UpdateTestInstrument
+jmp PreviewInstrument
 
 DecreaseSampleOffset: .a8
 	seta16
@@ -455,28 +688,15 @@ IncreaseSampleOffset:
 	:
 	seta16
 SetNewSampleDirectoryIndex:
-@samplePointer = 0
 	stx SampleDirectoryIndex
-	lda f:SampleDirectory,X
-	sta @samplePointer
-	seta8
-	lda f:SampleDirectory+2,X
-	sta @samplePointer+2
-	ldy #0
-	@nameLoop:
-		lda [@samplePointer],Y
-		iny
-		inc
-	bne @nameLoop
-	iny
-	iny
-	seta16
-	lda [@samplePointer],Y
-	sta PitchAdjust	
+
 	seta8
 	lda #1
 	sta WasChanged
+	
 	jsl UpdateTilemapBuffer
+	jsl BufferSamplePlayback
+	jsr PreviewInstrument
 rts
 
 .import Samples_TryAddSample, Samples_RemoveAddedSample, Samples_RefreshSamplesInSpc
@@ -487,7 +707,7 @@ SaveChanges:
 	cmp #$ffff
 	bne :+
 		seta8
-		jmp PlayMosaic
+		jmp NavigateBack
 		.a16
 	:
 	jsr Samples_TryAddSample

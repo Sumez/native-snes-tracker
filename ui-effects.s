@@ -101,10 +101,10 @@ Update_Vblank:
 	
 	lda ShowBg3
 	beq :+
-		lda #%00010110
+		lda #%00010111
 		bra :++
 	:
-		lda #%00010010
+		lda #%00010011
 	:
 	sta BLENDMAIN
 
@@ -128,7 +128,7 @@ HighlightChannel:
 		asl
 		asl
 		asl
-		sbc #01
+		adc #20
 	:
 	sta ChannelHighlights,X
 rts
@@ -138,7 +138,7 @@ HighlightChainRow:
 		asl
 		asl
 		asl
-		sbc #01
+		adc #20
 	:
 	sta ChainHighlight
 rts

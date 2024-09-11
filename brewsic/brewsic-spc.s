@@ -347,39 +347,39 @@ Command_SoundEffectQ = 6
 Command_TransferEnd = $ff
 
 CheckCpuCommunication:
-	cmp Com_LastReceived, SPC_PORT1 ; Port 1 indicates new message
+	cmp Com_LastReceived,SPC_PORT1 ; Port 1 changed indicates new message
 	beq @return
-	nop
-	cmp SPC_PORT0, #Command_Transfer ; Port 0 indicates message type
+	movw ya,SPC_PORT0 ; Fresh read from both PORT0 and PORT1 to prevent dirty reads on simultaneous read/write
+	cmp a, #Command_Transfer ; Port 0 indicates message type
 	bne :+
 		jmp !BeginTransfer
 	:
 
-	mov Com_LastReceived, SPC_PORT1 ; Even if we didn't recognize the command, we still need to look for the next
-	cmp SPC_PORT0, #Command_PlayTrack
+	mov Com_LastReceived,y ; Even if we didn't recognize the command, we still need to look for the next
+	cmp a, #Command_PlayTrack
 	bne :+
 		mov a, SPC_PORT2
 		jmp !PlayMusic
 	:
 	
-	cmp SPC_PORT0, #Command_StopTrack
+	cmp a, #Command_StopTrack
 	bne :+
 		jmp !StopTrack
 	:
 	
-;	cmp SPC_PORT0, #Command_SoundEffect
+;	cmp a, #Command_SoundEffect
 ;	bne :+
 ;		mov a, #$10
 ;		mov y, #$60
 ;		jmp !PlaySound
 ;	:
-;	cmp SPC_PORT0, #Command_SoundEffectH
+;	cmp a, #Command_SoundEffectH
 ;	bne :+
 ;		mov a, #$08
 ;		mov y, #$70
 ;		jmp !PlaySound
 ;	:
-;	cmp SPC_PORT0, #Command_SoundEffectQ
+;	cmp a, #Command_SoundEffectQ
 ;	bne :+
 ;		mov a, #$04
 ;		mov y, #$60
@@ -562,7 +562,7 @@ LoadTrack:
 	
 	mov a, #0 ; Always start at the beginning
 	mov !CurrentOrderIndex, a
-	; TODO: Define loop by a loop-start index instead of a loop command in the end (just go back to alway $00 in the end)
+	; TODO: Define loop by a loop-start index in song header?
 	mov !LoopToPattern, a
 	call !ResetPattern
 	inc PatternRowCounter ; Usually a new track is loaded AFTER counting down one row, so add +1 on the first pattern to acocunt for that

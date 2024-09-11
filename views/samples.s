@@ -73,6 +73,9 @@ LoadView:
 	jsl PrepareSampleEdit ; Might as well load samples again in case someone loaded a savestate after patching rom with new samples
 		
 	jsl WriteTilemapBuffer
+	
+	ldx #0
+	jsl LoadGuiMap
 rts
 
 LoadSamples:
@@ -402,6 +405,13 @@ RemoveAddedSample:
 	seta8
 rts
 
+.export Samples_IsSampleAdded = IsSampleAdded
+IsSampleAdded: .a16
+	sta DirectoryIndexToMatch
+	jsl FindAddedSample_long
+	inc a
+rts
+.a8
 .export Samples_TryAddSample = TryAddSample
 TryAddSample: .a16
 	; Gets AddedSample index if exists, otherwise adds to sample list
@@ -536,6 +546,8 @@ CopySamplesToSpcBuffer:
 	txa
 	ldx #0
 	stx z:@CurrentSampleDirectoryOffset
+	inc a
+	inc a ; Add one empty sample reference in the end of the directory to use for test samples
 	sta f:CompiledPattern,X ; First byte is the length of the sample directory (in # of samples)
 
 	asl ; Directory size (in bytes)
@@ -546,9 +558,7 @@ CopySamplesToSpcBuffer:
 	adc #SampleDirectoryAddress-1
 	sta z:@CurrentSampleStartAddress ; Address in SPC memory to be written into the directory
 	
-	; Account for the one byte before the sample directory, telling the size of it
-	inc z:@CurrentSampleDirectoryOffset
-	inc z:@CurrentTrackDirectoryOffset
+	inc z:@CurrentTrackDirectoryOffset ; Account for the one byte before the sample directory, telling the size of it
 	
 	seta8
 	lda #^CompiledPattern
@@ -556,6 +566,17 @@ CopySamplesToSpcBuffer:
 	pha
 	plb
 	seta16
+	
+	; Empty sample at the start
+	ldx z:@CurrentSampleDirectoryOffset
+	inx ; Account for the one byte before the sample directory, telling the size of it
+	stz CompiledPattern,X
+	inx
+	inx
+	stz CompiledPattern,X
+	inx
+	inx
+	stx z:@CurrentSampleDirectoryOffset
 	
 	ldx #0
 	stx @CurrentAddedSampleIndex
@@ -628,8 +649,9 @@ CopySamplesToSpcBuffer:
 	@endSampleLoop:
 	
 	ldx @CurrentTrackDirectoryOffset
+
 	lda z:@CurrentSampleStartAddress
-	sta CompiledPattern,X
+	sta CompiledPattern,X			; After sample directory, write track address (2 byte track directory)
 	sta f:TrackDataAddressInSpc
 	
 	lda z:@CurrentSampleDataOffset

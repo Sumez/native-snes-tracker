@@ -7,6 +7,8 @@
 
 .segment TilemapBufferSegment
 
+GuiTilemapBuffer:
+.res 32*28*2
 TilemapBuffer:
 .res 32*32*2
 .res $200 ; TODO: (remove) buffer because our song view currently overflows the tilemap buffer...
@@ -99,10 +101,15 @@ LoadBlockToOAM OamBuffer, 544
 	jsl Song_Init
 	jsl Chain_Init
 	jsl Pattern_Init
+
+.import FragmentedRemainingBytes
+ldx #0
+stx FragmentedRemainingBytes ; TODO: Init routine for playback handler
 	
 	; MESS WITH VRAM AFTER THIS POINT
 	stz $420C ; Halt any potential HDMA, that might interfer with our VRAM access
 	jsl LoadTextGraphics
+	jsl LoadGuiGraphics
 	
 	phk
 	plb
@@ -115,10 +122,15 @@ LoadBlockToOAM OamBuffer, 544
 	stx Bg3Offset
 	jsl CopyTilemapToUiLayer
 
+
+ldx #2
+stx ScrollY ; TODO: Dedicated GUI handler?
+
 	
 	lda #0
 	sta CurrentScreen
 	jsl LoadView
+	
 	jsl CopyEntireTilemap
 
 	stz PPUBRIGHT
@@ -126,8 +138,8 @@ LoadBlockToOAM OamBuffer, 544
 	lda #1 | %00001000 ; High priority background layer
 	sta BGMODE       ; Set Mode to 1
 
-	lda #Bg1TileMapBase >> 9 | 2
-	sta NTADDR       ; Set BG1's Tile Map VRAM offset to $0800 (word address) and the Tile Map size to 32x64tiles
+	lda #Bg1TileMapBase >> 9 | 0
+	sta NTADDR       ; Set BG1's Tile Map VRAM offset to $0800 (word address) and the Tile Map size to 32x32tiles
 	lda #Bg2TileMapBase >> 9 | 2
 	sta NTADDR+1       ; Set BG2's Tile Map VRAM offset to $f000 (word address) and the Tile Map size to 32x64tiles
 	lda #Bg3TileMapBase >> 9 | 2
@@ -147,7 +159,7 @@ LoadBlockToOAM OamBuffer, 544
 
 	;lda #%00000111
 	;lda #%00010100
-	lda #%00010010
+	lda #%00010011
 	sta BLENDMAIN
 	lda #%00000000
 	sta BLENDSUB
@@ -356,10 +368,10 @@ rts
 
 .export CopyEntireTilemap, CopyTilemapToUiLayer
 CopyEntireTilemap:
-	LoadBlockToVRAM TilemapBuffer, Bg2TileMapBase, 32*32*2
+	LoadBlockToVRAM TilemapBuffer, Bg2TileMapBase, 32*29*2
 rtl
 CopyTilemapToUiLayer:
-	LoadBlockToOffsetVRAM UiTilemapBuffer, Bg3Offset, 32*32*2
+	LoadBlockToOffsetVRAM UiTilemapBuffer, Bg3Offset, 32*29*2
 rtl
 
 .segment "CODE6"
@@ -368,33 +380,33 @@ LoadBackgroundUi:
 	jsr ClearUiTilemap
 	seta16
 	lda #$08df
-	ldx #$0FE
+	ldx #$0FE+$C0
 	:
 		sta f:UiTilemapBuffer,x
 		inx
 		inx
-		cpx #$116
+		cpx #$116+$C0
 	bne :-
-	ldx #$1FE
+	ldx #$1FE+$C0
 	:
 		sta f:UiTilemapBuffer,x
 		inx
 		inx
-		cpx #$216
+		cpx #$216+$C0
 	bne :-
-	ldx #$2FE
+	ldx #$2FE+$C0
 	:
 		sta f:UiTilemapBuffer,x
 		inx
 		inx
-		cpx #$316
+		cpx #$316+$C0
 	bne :-
-	ldx #$3FE
+	ldx #$3FE+$C0
 	:
 		sta f:UiTilemapBuffer,x
 		inx
 		inx
-		cpx #$416
+		cpx #$416+$C0
 	bne :-
 	seta8
 rtl
@@ -425,7 +437,7 @@ rts
 WriteTilemapHeader:
 	sty 0
 	ldy #0
-	ldx #$88
+	ldx #$C8
 	:
 		lda (0),y
 		bpl :+
@@ -456,7 +468,7 @@ rtl
 LoadView:
 	jsr ClearTilemap
 	stz ShowBg3
-	ldx #$108
+	ldx #$1C8
 	stx z:LoadView_TilemapOffset
 	jumpTable ViewLoaders
 rtl
@@ -530,3 +542,53 @@ HandleInput:
 	:
 
 jmp (Input_CustomHandler)
+
+
+; TODO: Dedicated GUI handler?
+
+LoadGuiMap:
+	
+	ldy MapDataAddresses, X
+	ldx #0
+	:
+		lda MapData,Y
+		sta f:GuiTilemapBuffer,X
+		lda #2<<2
+		sta f:GuiTilemapBuffer+1,X
+		inx
+		inx
+		iny
+		cpx #32*28*2
+	bne :-
+	lda #1
+	sta UpdateGui
+rtl
+
+.export CopyGuiTilemap
+CopyGuiTilemap:
+	stz UpdateGui
+	LoadBlockToVRAM GuiTilemapBuffer, Bg1TileMapBase, 32*28*2
+rtl
+
+
+LoadGuiGraphics:
+	LoadBlockToVRAM GuiChr, Bg1ChrBase, (GuiChrEnd - GuiChr)
+rtl
+
+MapDataAddresses:
+.addr SongGuiMap, ChainGuiMap, InstrumentGuiMap
+MapData:
+.incbin "gfx/gui.inc"
+SongGuiMap = 4
+ChainGuiMap = 4 + 32*30
+InstrumentGuiMap = 4 + 32*30*2
+
+
+.segment "RODATA"
+GuiChr:
+.incbin "gfx/gui.chr"
+GuiChrEnd:
+
+.segment "BSS"
+.export UpdateGui
+UpdateGui: .res 1

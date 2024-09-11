@@ -45,6 +45,8 @@ Test2: .res 1
 
 .define seta8 sep #$20
 .define seta16 rep #$20
+.define setxy8 sep #$10
+.define setxy16 rep #$10
 
 Fake:
 rts
@@ -224,7 +226,6 @@ transfer:
 xba
 lda #Command_Transfer ; Transfer command
 tax ; X now contains both transfer command, *and* the initial PORT1 check value (SPC code reads this, increments and sends back to tell when it's ready for the next block of 4 bytes)
-
 	stx PORT0
 	txa
 xba
@@ -275,6 +276,7 @@ tax
 	bcc @transferLoop
 	@endTransfer:
 	seta8
+	txa
 	inc a
 	xba
 	lda #Command_TransferEnd

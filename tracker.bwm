@@ -106,7 +106,7 @@
     <Pipeline>
       <Type>tilemap.custom</Type>
       <Output>gfx/font.inc</Output>
-      <LastProcessed>2024-08-20T13:32:37.8323772+02:00</LastProcessed>
+      <LastProcessed>2024-09-10T10:42:25.1973771+02:00</LastProcessed>
       <Property>
         <Key>script-type</Key>
         <Value>Python</Value>
@@ -411,5 +411,28 @@
     <Id>36</Id>
     <RelativePath>views/instrument.s</RelativePath>
     <Mode>IncludeInAssembly</Mode>
+  </File>
+  <File>
+    <Id>37</Id>
+    <RelativePath>gfx/gui.bwmap</RelativePath>
+    <Mode>ContentPipeline</Mode>
+    <Pipeline>
+      <Type>tilemap.custom</Type>
+      <Output>gfx/gui.inc</Output>
+      <LastProcessed>2024-09-10T08:46:26.641363+02:00</LastProcessed>
+      <Property>
+        <Key>script-type</Key>
+        <Value>Python</Value>
+      </Property>
+      <Property>
+        <Key>script-file</Key>
+        <Value>gfx/stage-convert.py</Value>
+      </Property>
+    </Pipeline>
+  </File>
+  <File>
+    <Id>38</Id>
+    <RelativePath>gfx/gui.inc</RelativePath>
+    <Mode>Ignore</Mode>
   </File>
 </BrewmasterProject>

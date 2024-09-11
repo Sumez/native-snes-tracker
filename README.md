@@ -17,15 +17,21 @@
     - Hold Delete while moving cursor to delete multiple
     - Make it visible ("greyed out"?) that a chain/phrase/instrument is "empty"/uncreated where selecting it
 - Rudimentary GUI
-    - More pleasant temporary graphics
+    - More pleasant temporary graphics <sup>In progress</sup>
     - Visible UI hints for easier navigation
-    - Row and column labels
+    - Row and column labels <sup>In progress</sup>
     - Highlight columns instead of rows on song view
     - `Convert tracker font to 2bpp and move to BG3 layer, use BG2 for UI graphics`
+    - `Dynamic variable width font for UI elements`
 - Basic tracker commands
     - Implement the ones already supported in the sound driver first - Pitch up/down, volume slide, arpeggio - loop and tempo change should be in song data instead? <sup>Partly implemented</sup>
     - ~~"Key off" entries~~ <sup>Done</sup>
-- ✅ ~~Edit instruments in tracker~~ <sup>Done</sup>
+- ✅ Edit instruments in tracker <sup>Done</sup>
+- Improve instrument editing
+    - Select sample from visible list of every sample
+    - Alter custom pitch (transpose+finetune)
+    - Alter instrument while song is playing for immediate feedback
+    - Define volume envelope
 - Improved sound driver
     - Better use of keyoff/keyon control instead of manual volume
     - ADSR support on instruments
@@ -34,10 +40,13 @@
     - ~~Ability to add as many samples as ExHiRom can fit~~ <sup>Done</sup>
     - ~~Manually pick which samples to include in a song in the song settings inside the tracker~~ <sup>Done</sup>
     - ~~`Rewrite to use HiRom or ExHiRom`~~ <sup>Done</sup>
+    - Improve SPC file ripping to avoid adding the same samples multiple times
+- Define loop points in samples
 - Make various SNES specific features available, make controlling DSP registers more direct using commands
 - Meta data
     - Edit song and author name
     - Assign name, and icon or color to instruments. Assign custom color to phrases and chains for easy recognition
+- Save multiple songs to SRAM. Export/Import songs using Patcher application
 - Simple view that vizualises APU memory used in both compressed and uncompressed form
     - Chain support in sound driver, handle looping from song data
     - `Generate compressed song data from tracker. Use note progression macros and silent blocks`

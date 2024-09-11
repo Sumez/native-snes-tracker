@@ -75,6 +75,8 @@ seta8
 	:
 		
 	jsl WriteTilemapBuffer
+	ldx #2
+	jsl LoadGuiMap
 rts
 
 .import Pattern_LoadView, Pattern_HideView, Pattern_FocusView

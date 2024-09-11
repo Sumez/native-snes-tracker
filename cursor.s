@@ -44,7 +44,7 @@ UpdateCursorSpriteAndHighlight:
 	and #2 ; Only cursor ID 0 or 2 allowed so far
 	tay
 	seta8
-	lda #0
+	lda #$20
 	ldx PrevCursorPositionOffset,Y
 	jsr SetPaletteValues
 
@@ -60,7 +60,7 @@ UpdateCursorSpriteAndHighlight:
 	sta PrevCursorPositionOffset,Y
 	tax
 	seta8
-	lda #1<<2
+	lda #(1<<2)|$20
 	jsr SetPaletteValues
 	
 	
@@ -73,7 +73,7 @@ UpdateCursorSpriteAndHighlight:
 	seta8
 	and #$F8
 	sec
-	sbc #3
+	sbc #5
 	sta OamBuffer+1
 	sta OamBuffer+1+4
 

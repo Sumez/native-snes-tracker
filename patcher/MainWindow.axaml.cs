@@ -16,7 +16,7 @@ namespace Patcher;
 public partial class MainWindow : Window
 {
 	private static string[] ValidSampleFiles = new[] { ".brr", ".wav", ".mp3", ".spc", ".sfc", ".smc", ".brrp" };
-	public static int PatchedSamplesStartAddress = 0x081900; // Get this dynamically by reading from another address in file
+	public static int PatchedSamplesStartAddress = 0x081E00; // Get this dynamically by reading from another address in file
 	public Patch Patch { get; set; }
 	public PreviewPlayer PreviewPlayer { get; set; }
 
@@ -168,7 +168,7 @@ public partial class MainWindow : Window
 	{
 		var name = new StringBuilder();
 		var nextByte = stream.ReadByte();
-		while (nextByte != 0xFF) { 
+		while (nextByte != 0xFF && stream.Position < stream.Length) { 
 			name.Append(CharMap.FromByte(nextByte));
 			nextByte = stream.ReadByte();
 		}
