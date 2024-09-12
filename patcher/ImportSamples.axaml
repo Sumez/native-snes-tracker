@@ -12,8 +12,11 @@
 				x:DataType="vm:SampleFileCollection"
 				Title="Import Samples">
 		<DockPanel>
+			<Border Padding="5">
+				<TextBlock IsVisible="{Binding IsEmpty}" FontWeight="Bold" Text="Parsing samples from file..." />
+			</Border>
 			<Button DockPanel.Dock="Bottom" Margin="10" Click="AddSelectedSamples" HorizontalAlignment="Stretch">Add selected samples</Button>
-			<Border>
+			<Border IsVisible="{Binding !IsEmpty}">
 				<ScrollViewer Padding="5,0">
 				<ItemsControl ItemsSource="{Binding}">
 					<ItemsControl.ItemTemplate>

@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Brewsic;
 using Brewsic.Playback;
 using Patcher.ViewModels;
 using System;
@@ -227,9 +228,16 @@ public partial class MainWindow : Window
 	}
 	private void AddSamplePack(Stream stream) => SetSamplesFromStream(stream);
 
+	private class SampleReference
+	{
+		public int StartAddress { get; set; }
+		public int EndAddress { get; set; }
+		public bool SuspectedInvalid { get; set; }
+		public bool Loops { get; set; }
+		public Brewsic.BrrSample Sample { get; set; }
+	}
 	private async Task ParseSpcDump(Stream stream, string name)
 	{
-		var counter = 0;
 		stream.Position = 0x1015D;
 		var directoryAddress = stream.ReadByte() << 8;
 
@@ -237,37 +245,69 @@ public partial class MainWindow : Window
 		var buffer = new byte[0x10000];
 		await stream.ReadAsync(buffer, 0, 0x10000);
 
-
 		var dialog = new ImportSamples();
 		var dialogTask = dialog.ShowDialog(this);
+
+		var parsedSamples = new List<SampleReference>();
 
 		while (directoryAddress < 0xFFFD)
 		{
 			var sampleAddress = buffer[directoryAddress] | (buffer[directoryAddress + 1] << 8);
 			var loopAddress = buffer[directoryAddress + 2] | (buffer[directoryAddress + 3] << 8);
 			var loopStart = loopAddress - sampleAddress;
+			directoryAddress += 4;
 
 			stream.Position = 0x100 + sampleAddress + 1;
 			var sampleSize = await DetectSampleData(stream);
-			if (sampleSize > 0)
+			if (sampleSize == 0) continue;
+
+			var suspectInvalid = false;
+			var endAddress = sampleAddress + sampleSize;
+
+			var brrSampleData = new byte[sampleSize];
+			stream.Position = 0x100 + sampleAddress;
+			await stream.ReadAsync(brrSampleData, 0, sampleSize);
+
+			var loops = (brrSampleData[sampleSize - 9] & 0x03) == 3;
+			if (loopStart < 0 || loopStart > sampleSize || (loopStart % 9) != 0)
 			{
-
-				var brrSampleData = new byte[sampleSize];
-				stream.Position = 0x100 + sampleAddress;
-				await stream.ReadAsync(brrSampleData, 0, sampleSize);
-
-				if (loopStart < 0 || loopStart > sampleSize || (loopStart % 9) != 0) loopStart = 0;
-				var sample = new Brewsic.BrrSample(brrSampleData, loopStart);
-				dialog.AddSampleFile(new SampleFile($"{name} {counter++.ToString().PadLeft(2, '0')}", sample) { Selected = false });
+				// Invalid loop start. If sample is set to loop, assume it's invalid
+				loopStart = 0;
+				if (loops) suspectInvalid = true;
 			}
-			directoryAddress += 4;
+			if (brrSampleData.Length < 600 && !loops) suspectInvalid = true; // Sample seems too short to not loop
+
+			var conflictingSample = parsedSamples.FirstOrDefault(e => e.StartAddress < endAddress && e.EndAddress > sampleAddress);
+			if (conflictingSample != null)
+			{
+				if (!conflictingSample.SuspectedInvalid || suspectInvalid) continue;
+				parsedSamples.Remove(conflictingSample); // Remove conflicting sample if suspected invalid and this one isn't. Otherwise continue
+			}
+			var sample = new BrrSample(brrSampleData, loopStart);
+			parsedSamples.Add(new SampleReference { 
+				StartAddress = sampleAddress,
+				EndAddress = endAddress,
+				SuspectedInvalid = suspectInvalid,
+				Loops = loops,
+				Sample = sample
+			});
 		}
-		if (counter == 0)
+		if (parsedSamples.Count == 0)
 		{
 			await new MessageBox("Didn't detect any BRR samples in source file - sorry :(").ShowDialog(dialog);
 			dialog.Close();
 		}
+		for (var i = 0; i < parsedSamples.Count; i++)
+		{
+			var sampleRef = parsedSamples[i];
+			var sampleName = $"{name} {i.ToString().PadLeft(2, '0')}";
+			//sampleName = parsedSamples[i].StartAddress.ToString("X4") + "->" + parsedSamples[i].EndAddress.ToString("X4");
+			if (sampleRef.SuspectedInvalid && sampleRef.Loops) sampleName += " (invalid loop point)";
+			var sampleFile = new SampleFile(sampleName, sampleRef.Sample) { Selected = !sampleRef.SuspectedInvalid };
+			dialog.AddSampleFile(sampleFile);
+		}
 		await dialogTask;
+		
 		foreach (var sample in dialog.SamplesToAddToPatch) Patch.AvailableSamples.Add(sample);
 	}
 

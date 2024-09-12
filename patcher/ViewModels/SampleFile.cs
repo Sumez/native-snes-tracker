@@ -9,8 +9,14 @@ namespace Patcher.ViewModels;
 
 public class SampleFileCollection : ObservableCollection<SampleFile>, INotifyPropertyChanged
 {
-	public SampleFileCollection() : base() { }
-	public SampleFileCollection(IEnumerable<SampleFile> sampleFiles) : base(sampleFiles) { }
+	public SampleFileCollection() : base() { Init(); }
+	public SampleFileCollection(IEnumerable<SampleFile> sampleFiles) : base(sampleFiles) { Init(); }
+
+	private void Init()
+	{
+		CollectionChanged += (o, e) => OnPropertyChanged(new PropertyChangedEventArgs(nameof(IsEmpty)));
+	}
+	public bool IsEmpty { get { return Count == 0; } }
 }
 
 public class SampleFile : INotifyPropertyChanged
