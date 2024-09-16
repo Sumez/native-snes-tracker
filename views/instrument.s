@@ -26,9 +26,12 @@ SampleDirectoryIndex: .res 2
 PreviousAddedSampleIndex: .res 2
 TilemapOffset: .res 2
 WasChanged: .res 1
+CustomSemitoneAdjust: .res 2
 CustomPitchAdjust: .res 2
 Volume: .res 2
 TestNote: .res 1
+
+UnusedInstruments: .res 53
 
 .export Instrument_CurrentSampleLoopOffset = CurrentSampleLoopOffset
 CurrentSampleSize: .res 2
@@ -46,6 +49,21 @@ CurrentSampleAddress: .res 3
 
 .export Instrument_Init = Init
 Init:
+	ldy #0
+	ldx #0
+	:
+		lda f:INSTRUMENTS,X
+		eor #$ff
+		sta UnusedInstruments,Y
+		iny
+		seta16
+		txa
+		clc
+		adc #8
+		tax
+		seta8
+		cpx #(53*8)
+	bne :-	
 rtl
 
 .export Instrument_FocusView = FocusView
@@ -83,22 +101,25 @@ rts
 
 .export Instrument_LoadView = LoadView
 LoadView:
-seta16
-	lda z:LoadView_TilemapOffset
-	sta TilemapOffset
-	
-	stz CustomPitchAdjust
-seta8
-	lda #$50
-	sta Volume
+	ldx z:LoadView_TilemapOffset
+	stx TilemapOffset
+
 	jsr Pattern_GetCurrentNote
 	sta TestNote
 	
 	tya
 	cmp #$ff
-	beq :++
+	beq @dontLoadInstrument
 		sta CurrentInstrumentIndex
+		
+		; DEFAULTS:
+		lda #$50
+		sta Volume
 		seta16
+		stz CustomSemitoneAdjust
+		stz CustomPitchAdjust
+
+		; LOAD INSTRUMENT DATA IF EXISTS
 		tya
 		asl
 		asl
@@ -109,11 +130,32 @@ seta8
 		and #$00ff
 		sta PreviousAddedSampleIndex
 		cmp #$ff
-		beq @noSample
+		beq @noSample ; No sample = No instrument data - use defaults
 			asl
 			pha
+			seta8
+			lda f:INSTRUMENTS+1,X
+			sec
+			sbc #64
+			sta CustomPitchAdjust
+			bpl :+
+				lda #$ff
+				sta CustomPitchAdjust+1
+			:
+
+			lda f:INSTRUMENTS+2,X
+			sec
+			sbc #96
+			sta CustomSemitoneAdjust
+			bpl :+
+				lda #$ff
+				sta CustomSemitoneAdjust+1
+			:
+
 			lda f:INSTRUMENTS+3,X
 			sta Volume
+			
+			seta16
 			
 			plx
 			lda f:AddedSamples,X
@@ -124,7 +166,7 @@ seta8
 		sta SampleDirectoryIndex
 		
 		seta8
-	:
+	@dontLoadInstrument:
 
 	stz WasChanged
 	jsl WriteBaseTilemapBuffer
@@ -207,29 +249,61 @@ Tilemap_TestNote = TilemapBuffer+MenuOffset1
 	:
 	
 	ldx TilemapOffset
-	seta16
-	lda CustomPitchAdjust
-	lsr
-	lsr
-	lsr
-	lsr
-	lsr
-	lsr ; Divide by 64 (64 pitch adjustments = one semitone)
-	seta8
-	PrintHexNumber TilemapBuffer+2+MenuOffset3
-	lda #'+'
+	
+	ldy #'+'
+	lda CustomSemitoneAdjust
+	bpl :+
+		ldy #'-'
+		eor #$ff
+		clc
+		adc #1
+	:
+	phy
+
+	ldy #0
+	sec
+	:
+		sbc #12
+		bcc :+
+			iny
+			bra :-
+	:
+	adc #12
+	pha
+	tya
+	ora #$40
+	sta TilemapBuffer+2+MenuOffset3,X
+	
+	lda #'-'
+	sta TilemapBuffer+4+MenuOffset3,X
+	
+	pla
+	tay
+	ora #$40
+	sta TilemapBuffer+6+MenuOffset3,X
+	
+	ply
+	tya
 	sta TilemapBuffer+MenuOffset3,X
-	lda CustomPitchAdjust+1
-	and #63
-	PrintHexNumber TilemapBuffer+2+MenuOffset4
-	lda #'+'
-	sta TilemapBuffer+MenuOffset4,X
+	
+	ldy #'+'
+	lda CustomPitchAdjust
+	bpl :+
+		ldy #'-'
+		eor #$ff
+		clc
+		adc #1
+	:
+	PrintHexNumber TilemapBuffer+4+MenuOffset4
+	tya
+	sta TilemapBuffer+2+MenuOffset4,X
 
 	ldy #'_'
 	lda Volume
 	bpl :+
 		ldy #'-'
 		eor #$ff
+		clc
 		adc #1
 	:
 	PrintHexNumber TilemapBuffer+2+MenuOffset2
@@ -378,7 +452,21 @@ UpdateTestInstrument:
 		rts
 	:
 	seta16
-	lda CurrentSamplePitchAdjust
+	;bpl :+
+	;	ora #$FF00
+	;	bra :++
+	;:
+	;	and #$00FF
+	;:
+	lda CustomSemitoneAdjust
+	asl
+	asl
+	asl
+	asl
+	asl
+	asl ; x64
+	clc
+	adc CurrentSamplePitchAdjust
 	clc
 	adc CustomPitchAdjust
 	tax
@@ -423,9 +511,9 @@ Text_Empty = * - Text
 Text_TestInstrument = * - Text
 .byte "Test_note",$ff
 Text_PitchAdjust = * - Text
-.byte "Shift_semitone",$ff
+.byte "_Shift_semitone",$ff
 Text_FineTune = * - Text
-.byte "Fine-tune_pitch",$ff
+.byte "_Fine-tune_pitch",$ff
 Text_Volume = * - Text
 .byte "Volume",$ff
 
@@ -499,19 +587,104 @@ rts
 		bne @EditMode
 			jsr PreviewInstrument
 			lda #1
-			bra :++
+			bra @storeNewState
 	:
 		lda EditMode
-		beq @Navigation
-			jsr CutCurrentlyPlayingNote
-			lda #0
-	:
+		bne :+
+			jmp @Navigation
+		:
+		jsr CutCurrentlyPlayingNote
+		lda #0
+	@storeNewState:
 	sta EditMode
-	jsr ShowCursor
-	beq @Navigation
+jmp ShowCursor
 
 @EditMode:
 
+	lda ButtonPushed+1
+	bit #>KEY_UP|>KEY_DOWN
+	beq LeftOrRight
+
+	lda CursorPosition
+	cmp #1
+	bne @afterTestNote
+		; Alter test note
+		lda ButtonPushed+1
+		bit #>KEY_DOWN
+		beq :+
+			lda #($100-12)
+			jmp ChangeTestNote
+		:
+		bit #>KEY_UP
+		beq :+
+			lda #12
+			jmp ChangeTestNote
+		:
+		rts
+	@afterTestNote:
+	cmp #2
+	bne @afterVolume
+		lda ButtonPushed+1
+		bit #>KEY_UP
+		beq :+
+			lda #$10
+			jmp ChangeVolume
+		:
+		bit #>KEY_DOWN
+		beq :+
+			lda #$f0
+			jmp ChangeVolume
+		:
+		rts
+	@afterVolume:
+	cmp #3
+	bne @afterToneAdjust
+		; Alter semitone adjustment
+		lda ButtonPushed+1
+		bit #>KEY_UP
+		beq :+
+			lda #12
+			jmp ChangeSemitoneAdjust
+		:
+		bit #>KEY_DOWN
+		beq :+
+			lda #($100-12)
+			jmp ChangeSemitoneAdjust
+		:
+		rts
+	@afterToneAdjust:
+	cmp #4
+	bne @afterPitchAdjust
+		; Alter pitch adjustment
+		lda ButtonPushed+1
+		bit #>KEY_UP
+		beq :+
+			lda #$10
+			jmp ChangePitchAdjust
+		:
+		bit #>KEY_DOWN
+		beq :+
+			lda #$f0
+			jmp ChangePitchAdjust
+		:
+		rts
+	@afterPitchAdjust:
+bra LeftOrRight
+
+@Navigation:
+
+	lda ButtonPushed+1
+	bit #>KEY_DOWN
+	beq :+
+		jmp MoveCursorDown
+	:
+	bit #>KEY_UP
+	beq :+
+		jmp MoveCursorUp
+	:
+
+LeftOrRight:
+	; Left/Right in instrument view doesn't require edit mode to be held
 	lda CursorPosition
 	bne @afterSample
 		; Select sample
@@ -540,21 +713,10 @@ rts
 			lda #$01
 			jmp ChangeTestNote
 		:
-		bit #>KEY_DOWN
-		beq :+
-			lda #($100-12)
-			jmp ChangeTestNote
-		:
-		bit #>KEY_UP
-		beq :+
-			lda #12
-			jmp ChangeTestNote
-		:
-		rts
 	@afterTestNote:
 	cmp #2
 	bne @afterVolume
-		; Select sample
+		; Alter volume
 		lda ButtonPushed+1
 		bit #>KEY_LEFT
 		beq :+
@@ -566,30 +728,40 @@ rts
 			lda #1
 			jmp ChangeVolume
 		:
-		bit #>KEY_UP
-		beq :+
-			lda #$10
-			jmp ChangeVolume
-		:
-		bit #>KEY_DOWN
-		beq :+
-			lda #$f0
-			jmp ChangeVolume
-		:
 		rts
 	@afterVolume:
-rts
-@Navigation:
-
-	lda ButtonPushed+1
-	bit #>KEY_DOWN
-	beq :+
-		jmp MoveCursorDown
-	:
-	bit #>KEY_UP
-	beq :+
-		jmp MoveCursorUp
-	:
+	cmp #3
+	bne @afterToneAdjust
+		; Alter semitone adjustment
+		lda ButtonPushed+1
+		bit #>KEY_LEFT
+		beq :+
+			lda #$ff
+			jmp ChangeSemitoneAdjust
+		:
+		bit #>KEY_RIGHT
+		beq :+
+			lda #1
+			jmp ChangeSemitoneAdjust
+		:
+		rts
+	@afterToneAdjust:
+	cmp #4
+	bne @afterPitchAdjust
+		; Alter pitch adjustment
+		lda ButtonPushed+1
+		bit #>KEY_LEFT
+		beq :+
+			lda #$ff
+			jmp ChangePitchAdjust
+		:
+		bit #>KEY_RIGHT
+		beq :+
+			lda #1
+			jmp ChangePitchAdjust
+		:
+		rts
+	@afterPitchAdjust:
 rts
 
 MoveCursorDown:
@@ -646,6 +818,76 @@ ChangeVolume:
 		lda #$7F
 	@noOverflow:
 	sta Volume
+
+	lda #1
+	sta WasChanged
+
+	jsl UpdateTilemapBuffer
+	jsr UpdateTestInstrument
+jmp PreviewInstrument
+
+ChangePitchAdjust:
+	clc
+	adc CustomPitchAdjust
+	sta CustomPitchAdjust
+	bpl :+
+	
+		sbc #65
+		bvc @noOverflow
+		; Overflow (value changed from positive to negative or vice versa)
+		; Clamp negative value at -63
+		lda #$C1
+		sta CustomPitchAdjust
+		bra @noOverflow
+	:
+		adc #64
+		bvc @noOverflow
+		; And positive at +63
+		lda #63
+		sta CustomPitchAdjust
+
+	@noOverflow:
+	lda #$00
+	bit CustomPitchAdjust
+	bpl :+
+		lda #$ff
+	:
+	sta CustomPitchAdjust+1 ; Extend negative bit to 16bits
+
+	lda #1
+	sta WasChanged
+
+	jsl UpdateTilemapBuffer
+	jsr UpdateTestInstrument
+jmp PreviewInstrument
+
+ChangeSemitoneAdjust:
+	clc
+	adc CustomSemitoneAdjust
+	sta CustomSemitoneAdjust
+	bpl :+
+	
+		sbc #33
+		bvc @noOverflow
+		; Overflow (value changed from positive to negative or vice versa)
+		; Clamp negative value at -95
+		lda #$A1
+		sta CustomSemitoneAdjust
+		bra @noOverflow
+	:
+		adc #32
+		bvc @noOverflow
+		; And positive at +95
+		lda #95
+		sta CustomSemitoneAdjust
+
+	@noOverflow:
+	lda #$00
+	bit CustomSemitoneAdjust
+	bpl :+
+		lda #$ff
+	:
+	sta CustomSemitoneAdjust+1 ; Extend negative bit to 16bits
 
 	lda #1
 	sta WasChanged
@@ -716,10 +958,25 @@ SaveChanges:
 	ldx CurrentInstrumentOffset
 	lsr
 	sta f:INSTRUMENTS+0,X
+	ldy CurrentInstrumentIndex
+	eor #$ff
+	sta UnusedInstruments,Y
+
 	lda PreviousAddedSampleIndex
 	jsr RemoveAddedSampleIfUnused
 	
 	ldx CurrentInstrumentOffset
+
+	lda CustomPitchAdjust
+	clc
+	adc #64
+	sta f:INSTRUMENTS+1,X
+
+	lda CustomSemitoneAdjust
+	clc
+	adc #96
+	sta f:INSTRUMENTS+2,X
+	
 	lda Volume
 	sta f:INSTRUMENTS+3,X
 	

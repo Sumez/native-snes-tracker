@@ -339,7 +339,19 @@ ldy #0
 		
 		ldy @currentNote
 		lda PatternInstruments,Y
+		tay
 		PrintHexNumber TilemapBuffer+8
+		
+		lda UnusedInstruments, Y
+		bne :+
+			lda #2<<2
+			bra :++
+		:
+			lda #0
+		:
+		sta f:TilemapBuffer+9,X
+		sta f:TilemapBuffer+11,X
+		ldy @currentNote
 		
 	bra :+
 	@cutNote:
@@ -453,10 +465,16 @@ PlayCurrentNote:
 		jsr CutCurrentlyPlayingNote
 		
 		ldy CursorPositionRow
-		lda PatternInstruments,Y
+		lda #0
 		xba
-		lda PatternNotes,Y
-		jmp PlaySingleNote
+		lda PatternInstruments,Y
+		tax
+		lda UnusedInstruments,X ; Don't play note if no instrument sample set
+		beq :+
+			lda PatternInstruments,Y
+			xba
+			lda PatternNotes,Y
+			jmp PlaySingleNote
 	:
 rts
 CutCurrentlyPlayingNote:
@@ -757,10 +775,10 @@ ChangeCurrentInstrument:
 		lda #0
 		bra @continue
 	:
-	cmp FirstUnusedInstrument
-	bcc @continue
-		lda FirstUnusedInstrument
-		bra @continue
+	;cmp FirstUnusedInstrument
+	;bcc @continue
+	;	lda FirstUnusedInstrument
+	;	bra @continue
 
 	cmp #MAX_INSTRUMENTS
 	bcc @continue

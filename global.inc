@@ -14,7 +14,7 @@ MAX_INSTRUMENTS = 53
 .global SONG, CHAINS, PHRASES_1, PHRASES_2, INSTRUMENTS, SAMPLES
 .globalzp Input_CustomHandler, Input_NavigateIn, Input_NavigateBack, Input_MoveLeft, Input_MoveUp, Input_MoveRight, Input_MoveDown
 .globalzp Input_StartPlayback, OnPlaybackStopped
-.global CurrentScreen, IsPlaying, CompiledPattern, TilemapBuffer, GuiTilemapBuffer, UiTilemapBuffer, EditMode
+.global CurrentScreen, IsPlaying, CompiledPattern, TilemapBuffer, GuiTilemapBuffer, UiTilemapBuffer, EditMode, UnusedInstruments
 .global Notes, Octaves, NotesSharp
 .globalzp SingleNotePatternOffsetInSpcSource ; Unsure about these
 

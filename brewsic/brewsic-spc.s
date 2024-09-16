@@ -215,8 +215,8 @@ ResetDsp:
 		sbc Temp, #$10
 	bpl @initChannelLoop
 	
-	dsp DSP_MVOL, $60;60
-	dsp DSP_MVOLR, $60;60
+	dsp DSP_MVOL, $7F;60
+	dsp DSP_MVOLR, $7F;60
 	dsp DSP_EVOL, $00
 	dsp DSP_EVOLR, $00
 	dsp DSP_EFB, $00

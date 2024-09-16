@@ -86,7 +86,7 @@ InitMidScreen:
 InitEditor:
 .export InitEditor
 .import LoadTextGraphics, LoadPalettes
-.import Cursor_Init, Pattern_Init, Chain_Init, Song_Init, Samples_Init
+.import Instrument_Init, Cursor_Init, Pattern_Init, Chain_Init, Song_Init, Samples_Init
 
 	jsr LoadSong ; TODO: Handle this BEFORE going into the editor
 	
@@ -95,6 +95,7 @@ jsr ResetSprites
 jsr FinalizeSprites
 LoadBlockToOAM OamBuffer, 544
 
+	jsl Instrument_Init
 	jsl Samples_Init
 	jsl Cursor_Init
 	jsl Vfx_Init

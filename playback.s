@@ -611,16 +611,27 @@ rtl
 
 CopySongHeaderAndCalculateOffsets:
 .import GetFirstUnusedInstrumentOffset
-@instrumentSize = 0
+@patternStart = 0
 
-	pha
-	jsr GetFirstUnusedInstrumentOffset
-	stx @instrumentSize ; Instrument size in song and SPC data are 1:1 (8 bytes) so offset can be used as-is
-	pla
+	sta @patternStart
+	stz @patternStart+1
+
+	ldy #0
+	ldx #(MAX_INSTRUMENTS-1)
+	:	lda f:UnusedInstruments,X
+		beq :+
+			iny
+		:
+		dex
+	bpl :--
+	
 	seta16
-	and #$ff
+	tya
+	asl
+	asl
+	asl
 	clc
-	adc @instrumentSize	
+	adc @patternStart
 	tay ; Now Y = where we start writing pattern data
 
 	; HEADER
@@ -637,6 +648,7 @@ rts
 
 .a16
 CopyMacrosAndInstruments:
+@pitchAdjust = 0 ; temp value used for some math
 	lda #$ffff ; Empty macro table
 	sta CompiledPattern,Y
 	iny
@@ -656,8 +668,9 @@ CopyMacrosAndInstruments:
 		lda f:INSTRUMENTS+0,X ; Get Added-sample Index
 		and #$00ff
 		cmp #$ff
-		beq @breakInstrumentLoop
-		
+		beq @nextInstrument
+		;beq @breakInstrumentLoop
+
 		phx
 		inc a ; Samples start at index #1 to make room for test sample/sound effects
 		sta CompiledPattern+0,Y
@@ -667,9 +680,25 @@ CopyMacrosAndInstruments:
 		lda f:AddedSamples,X
 		tax
 		lda f:SampleDirectory+6,X ; Get pitch-adjust from sample directory
-		sta CompiledPattern+1,Y
+		sta @pitchAdjust
 		plx
 		
+		lda f:INSTRUMENTS+1,X ; Get Semitone adjust * 256
+		and #$ff00
+		lsr
+		lsr ; *256 / 4 is cheaper than *64
+		clc
+		adc @pitchAdjust
+		sta @pitchAdjust
+		
+		lda f:INSTRUMENTS+1,X
+		and #$00ff
+		clc
+		adc @pitchAdjust
+		sec
+		sbc #(96*64+64)
+		sta CompiledPattern+1,Y
+
 		lda #$00
 		sta CompiledPattern+3,Y ; No fadeout implemented yet(?? - just just ADSR envolope)
 		lda f:INSTRUMENTS+3,X ; Volume (8bit)
@@ -681,15 +710,16 @@ CopyMacrosAndInstruments:
 		
 		tya
 		clc
-		
 		adc #8
 		tay
 		
+		@nextInstrument:
 		txa
 		clc
 		adc #8
 		tax
-	bra :-
+		cpx #$200
+	bne :-
 	@breakInstrumentLoop:
 	
 	sty CurrentCompileIndex
