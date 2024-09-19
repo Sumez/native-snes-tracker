@@ -816,8 +816,12 @@ ChangeCurrentCommandParam:
 @signCheck = 0
 	sta @signCheck
 	ldx CursorPositionRow
-	ldy PatternCommands,x
+	lda #0
+	xba ; Ensure 8bit value in 16bit Y
+	lda PatternCommands,x
+	tay
 
+	lda @signCheck
 	clc
 	adc PatternCommandParams,x
 	sta PatternCommandParams,x
@@ -859,9 +863,9 @@ jmp NoteWasChanged
 CommandParamMinValues:
 .byte 0,$01,$00,$00,$00,$00,$00,0,$e0,$80,0,$00
 CommandParamMaxValues:
-.byte 0,$40,$1f,$1f,$7f,$ff,$ff,0,$20,$7f,1,$ff
+.byte 0,$40,$1f,$1f,$7f,$ff,$ff,$ff,$20,$7f,1,$ff
 CommandParamRanges:
-.byte 0,$3F,$1F,$1F,$7F,$ff,$ff,0,$41,$ff,1,$ff
+.byte 0,$3F,$1F,$1F,$7F,$ff,$ff,$ff,$41,$ff,1,$ff
 
 .import Chain_MovePhraseUp, Chain_MovePhraseDown
 MoveCursorDown:
