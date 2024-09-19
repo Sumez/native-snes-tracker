@@ -1159,4 +1159,4 @@ rtl
 
 TestPatternSource:
 ;HEADER
-.byte $06,$50, $7F,$20, $7F,$20, $7F,$20, $7F,$20, $7F,$20, $7F,$20, $7F,$20, $7F,$20
+.byte $06,$50, $7F,0, $7F,0, $7F,0, $7F,0, $7F,0, $7F,0, $7F,0, $7F,0 ; Tempo / 8 * Vol+Pan

@@ -75,69 +75,65 @@ LoopToPattern: .res 1
 ;*****************************************************************************************
 ; registers
 ;*****************************************************************************************
-SPC_TEST	=0F0h ; undocumented
-SPC_CONTROL	=0F1h ; control register
-SPC_DSP		=0F2h
-SPC_DSPA	=0F2h
-SPC_DSPD	=0F3h
-SPC_PORT0	=0F4h ; i/o port0
-SPC_PORT1	=0F5h ; i/o port1
-SPC_PORT2	=0F6h ; i/o port2 - Reads command params, Writes current bar in current pattern
-SPC_PORT3	=0F7h ; i/o port3 - Reads command params, Writes 0xFF(?) after track is done playing (nothing set before first playback)
-SPC_FLAGS	=0F8h ; custom flags
-SPC_TIMER0	=0FAh ; timer0 setting
-SPC_TIMER1	=0FBh ; timer1 setting
-SPC_TIMER2	=0FCh ; timer2 setting
-SPC_COUNTER0	=0FDh ; timer0 counter
-SPC_COUNTER1	=0FEh ; timer1 counter
-SPC_COUNTER2	=0FFh ; timer2 counter
-
-DEBUG_P0 = SPC_PORT0
-DEBUG_P2 = SPC_PORT2
+SPC_TEST		= $F0 ; undocumented
+SPC_CONTROL		= $F1 ; control register
+SPC_DSPA		= $F2
+SPC_DSPD		= $F3
+SPC_PORT0		= $F4 ; i/o port0
+SPC_PORT1		= $F5 ; i/o port1
+SPC_PORT2		= $F6 ; i/o port2 - Reads command params, Writes current bar in current pattern
+SPC_PORT3		= $F7 ; i/o port3 - Reads command params, Writes 0xFF(?) after track is done playing (nothing set before first playback)
+SPC_FLAGS		= $F8 ; custom flags
+SPC_TIMER0		= $FA ; timer0 setting
+SPC_TIMER1		= $FB ; timer1 setting
+SPC_TIMER2		= $FC ; timer2 setting
+SPC_COUNTER0	= $FD ; timer0 counter
+SPC_COUNTER1	= $FE ; timer1 counter
+SPC_COUNTER2	= $FF ; timer2 counter
 
 ;*****************************************************************************************
 ; dsp registers
 ;*****************************************************************************************
-DSPV_VOL	=00h
-DSPV_VOLR	=01h
-DSPV_PL		=02h
-DSPV_PH		=03h
-DSPV_SRCN	=04h
-DSPV_ADSR1	=05h
-DSPV_ADSR2	=06h
-DSPV_GAIN	=07h
-DSPV_ENVX	=08h
-DSPV_OUTX	=09h
+DSPV_VOL	= $00
+DSPV_VOLR	= $01
+DSPV_PL		= $02
+DSPV_PH		= $03
+DSPV_SRCN	= $04
+DSPV_ADSR1	= $05
+DSPV_ADSR2	= $06
+DSPV_GAIN	= $07
+DSPV_ENVX	= $08
+DSPV_OUTX	= $09
 
-DSP_MVOL	=0Ch
-DSP_MVOLR	=1Ch
-DSP_EVOL	=2Ch
-DSP_EVOLR	=3Ch
-DSP_KON		=4Ch
-DSP_KOF		=5Ch
-DSP_FLG		=6Ch
-DSP_ENDX	=7Ch
+DSP_MVOL	= $0C
+DSP_MVOLR	= $1C
+DSP_EVOL	= $2C
+DSP_EVOLR	= $3C
+DSP_KON		= $4C
+DSP_KOF		= $5C
+DSP_FLG		= $6C
+DSP_ENDX	= $7C
 
-DSP_EFB		=0Dh
-DSP_PMON	=2Dh
-DSP_NON		=3Dh
-DSP_EON		=4Dh
-DSP_DIR		=5Dh
-DSP_ESA		=6Dh
-DSP_EDL		=7Dh
+DSP_EFB		= $0D
+DSP_PMON	= $2D
+DSP_NON		= $3D
+DSP_EON		= $4D
+DSP_DIR		= $5D
+DSP_ESA		= $6D
+DSP_EDL		= $7D
 
-DSP_C0		=0Fh
-DSP_C1		=1Fh
-DSP_C2		=2Fh
-DSP_C3		=3Fh
-DSP_C4		=4Fh
-DSP_C5		=5Fh
-DSP_C6		=6Fh
-DSP_C7		=7Fh
+DSP_C0		= $0F
+DSP_C1		= $1F
+DSP_C2		= $2F
+DSP_C3		= $3F
+DSP_C4		= $4F
+DSP_C5		= $5F
+DSP_C6		= $6F
+DSP_C7		= $7F
 
-FLG_RESET	=80h
-FLG_MUTE	=40h
-FLG_ECEN	=20h
+FLG_RESET	= $80
+FLG_MUTE	= $40
+FLG_ECEN	= $20
 
 
 .macro dsp addr, value
@@ -157,27 +153,28 @@ jmp !PlayMusic
 
 DriverEntryPoint:
 
-dsp $10, $00
-dsp $11, $00
-dsp $20, $00
-dsp $21, $00
-dsp $30, $00
-dsp $31, $00
-dsp $40, $00
-dsp $41, $00
-dsp $50, $00
-dsp $51, $00
-dsp $60, $00
-dsp $61, $00
-dsp $70, $00
-dsp $71, $00
-
+call !ResetDsp
 
 dsp DSP_KOF, $00
 dsp DSP_DIR, (SampleDirectoryAddress >> 8)
 
-call !ResetDsp
-dsp DSP_FLG, $20
+dsp DSP_FLG, $20 ; <- disables echo
+
+dsp DSP_ESA, $7e
+dsp DSP_EDL, $02
+dsp $0f, 127
+dsp $1f, 0
+dsp $2f, 0
+dsp $3f, 0
+dsp $4f, 0
+dsp $5f, 0
+dsp $6f, 0
+dsp $7f, 0
+;dsp DSP_FLG, $00 ; <- enables echo
+;dsp DSP_EVOL, $7f
+;dsp DSP_EVOLR, $7f
+dsp DSP_EFB, 100
+dsp DSP_EON, $ff
 
 mov OneTwo, #0
 ;TODO: Clear communication ram
@@ -839,10 +836,7 @@ BufferChannelRow:
 			bcc @readNote
 
 				bne :+
-					; Cut note (60)
 					call !CutNote
-					;mov a, #0
-					;mov ChVolume+x, a
 					bra @end
 				:
 				; Fade/off note (61/62) (currently treated as the same)
@@ -863,19 +857,17 @@ NoEffect:
 ret
 EffectRoutines:
 	.addr NoEffect
-	.addr SetSpeed			;A
-	.addr NoEffect
-	;.addr JumpToPattern		;B
-	.addr NoEffect
-	;.addr JumpToNextPattern	;C
-	.addr VolumeSlide		;D
-	.addr PitchDown			;E
-	.addr PitchUp			;F
-	.addr VolumeAdjust
-	.addr NoEffect	;H
-	.addr NoEffect	;I
-	.addr Arpeggio			;J
-	.addr NoEffect	;K
+	.addr E_SetSpeed		;A
+	.addr E_GainDown		;B
+	.addr E_GainUp			;C
+	.addr E_GainSet			;D
+	.addr E_PitchDown		;E
+	.addr E_PitchUp			;F
+	.addr E_Arpeggio 		;G
+	.addr E_Pan				;H
+	.addr E_ChannelVolume	;I
+	.addr E_Echo			;J
+	.addr E_SampleOffset	;K
 	.addr NoEffect	;L
 	.addr NoEffect	;M
 	.addr NoEffect	;N
@@ -911,7 +903,7 @@ Special:
 	@return:
 ret
 
-Arpeggio:
+E_Arpeggio:
 	push y
 	pop x
 	cmp a, #0
@@ -994,7 +986,7 @@ ret
 	pop a
 ret
 
-PitchUp:
+E_PitchUp:
 	call !GetPitchAdjustment
 	
 	clrc
@@ -1011,7 +1003,7 @@ PitchUp:
 		mov ChPitchH+x, a
 	:
 ret
-PitchDown:
+E_PitchDown:
 	call !GetPitchAdjustment
 	
 	setc
@@ -1028,86 +1020,35 @@ PitchDown:
 		mov ChPitchH+x, a
 	:
 ret
-VolumeAdjust:
+E_ChannelVolume:
 	push y
 	pop x
 	mov ChVolume+x, a
 ret
-VolumeSlide:
-@sub = Temp
-	push y
-	pop x
-	cmp a, #0
-	bne :+
-		mov a, !ChLastVolumeAdjust+x
-	:
-	mov !ChLastVolumeAdjust+x, a
-
-	push a
-	cmp a, #$0f
-	beq @decrease ; $0F decreases on every tick
-	
-; TODO: Test everything past this, test module only had D0F effects
-	cmp EffectCounter, #1
-	bne @otherTicks
-		; First tick
-		cmp a, #$f0
-		beq @return
-		cmp a, #$ff
-		beq @return
-		cmp a, #$f0
-		bcc :+
-			; $Fx, Fine decrease
-			@decrease:
-			pop a
-			and a, #$0F
-			mov @sub, a
-			mov a, ChVolume+x
-			setc
-			sbc a, @sub
-			bcs @noUnderflow
-				mov a, #0
-			@noUnderflow:
-			mov ChVolume+x, a
-			ret
-		:
-		and a, #$0f
-		cmp a, #$0f
-		bne @return
-			; $xF, Fine increase
-			@increase:
-			pop a
-			lsr a
-			lsr a
-			lsr a
-			lsr a
-			clrc
-			adc a, ChVolume+x
-			cmp a, #64
-			bcc @noOverflow
-				mov a, #64
-			@noOverflow:
-			mov ChVolume+x, a
-			ret
-			
-	@otherTicks:
-	;TEST
-		cmp a, #$10
-		bcs @decrease
-			; Increase?
-			and a, #$0f
-			cmp a, #$00
-			beq @increase
-
-	@return:
-	pop a
+E_GainDown:
+E_GainUp:
+E_GainSet:
 ret
-SetSpeed:
+E_SetSpeed:
 	cmp a, #0
 	beq :+
 		mov TrackSpeed, a
 	:
 ret
+E_Pan:
+	push y
+	pop x
+	mov ChPan+x, a	
+ret
+E_Echo:
+	push y
+	pop x
+	mov a, !ChannelBits+x
+	
+ret
+E_SampleOffset:
+ret
+
 JumpToPattern:
 	cmp TickCountDown, #1
 	bne :+
@@ -1124,6 +1065,7 @@ JumpToNextPattern:
 return: ret
 
 CutNote:
+	; TODO : Write $9C to Gain to prevent pop when no ADSR is set?
 	mov a, !ChannelBits+x
 	or a, !NoteOff
 	mov !NoteOff, a
@@ -1235,6 +1177,10 @@ ReadNote:
 	cmp a, #$ff
 	bne :+
 		mov a, !ChCurrentInstrumentVolume+x
+		mov y, ChBaseVol+x
+		mul ya
+		mov a, y
+		asl a ; (Instrument Volume * Channel base volume) << 1 = Final volume
 	:
 	mov ChVolume+x, a
 
@@ -1260,7 +1206,7 @@ ReadNote:
 	mov ChFadeOutL+x, a
 	mov ChFadeOutH+x, y
 	
-	mov a, !ChannelBits+x
+	mov a, !ChannelBits+x ; Set Key for current channel to "ON"
 	or a, !NoteStates
 	mov !NoteStates, a
 
@@ -1388,119 +1334,49 @@ UpdateDspChannel:
 	mov	Temp+5, a
 
 	@volumeAdjustment:
-@channelVolume = Temp+6
-@fadeOutH = Temp+7
-@envelopeAddress = Temp+8
-@envelopeDeltaFix = Temp+10
-@fadeDelta = Temp+8
-@envelopeDelta = Temp+10
-;	mov y, ChBaseVol+x
-	;mov a, !ChCurrentInstrumentVolume+x
-	;mul ya
-;	mov @channelVolume, y
-	mov a, ChBaseVol+x
-	mov @channelVolume, a
-	mov y, ChVolume+x
-	cmp y, #65
-	bcs :++ ; We don't understand any volume values >= 64 (0-64 is volume adjust)
-		cmp a, #64 ; If A = 64, use 100% of adjustment value
-		beq :+
-			; Adjust Base vol (0-63) to (0-255) range
-			asl a
-			asl a
-			; After multiplying, high byte should be the new channel volume (0-63)
-			mul ya
-		:
-		mov @channelVolume, y
-	:
-	
-	mov a, ChVolumeEnvelopeH+x
-	beq @noEnvelope
-		applyVolumeEnvelope
-	@noEnvelope:
-	mov a, !ChCurrentFadeAmount+x
-	mov y, #$00
-	movw @fadeDelta, ya
-	mov a, !ChCurrentVEnvelopeStepH+x
-	mov y, a
-	mov a, !ChCurrentVEnvelopeStepL+x ; TODO: only use temp values here
-	movw @envelopeDelta, ya
-	
-	mov a, ChFadeOutH+x
-	mov y, a
-	mov a, ChFadeOutL+x
-	
-	subw ya, @fadeDelta
-	bcs :+
-		; Don't allow fade to underflow
-		mov a, #0
-		mov y, #0
-	:
-	addw ya, @envelopeDelta
-	bcc :+
-		cmp @envelopeDelta+1, #$80
-		bcs @noUnderflow
-		mov a, #0
-		mov y, #0
-	:
-		cmp @envelopeDelta+1, #$80
-		bcc @noOverflow
-		mov a, #$00
-		mov y, #$04
-	@noUnderflow:
-	@noOverflow:
-	mov ChFadeOutL+x, a
-	mov ChFadeOutH+x, y
-	
-	mov @fadeOutH, y
-	cmp y, #$04 ; Fade $400 = max volume
-	bcs :+
-		mov a, ChFadeOutL+x
-		lsr @fadeOutH
-		ror a
-		lsr @fadeOutH
-		ror a
-		mov y, @channelVolume
-		mul ya
-		mov @channelVolume, y
-	:
-
 
 	@pan:
-@volumeReduction = Temp+7
+@adjustedVolume = Temp+7
 @panAmount = Temp+8
 	mov a, ChPan+x
-	mov @panAmount, a
-	setc
-	sbc a, #32
-	bcs :+
-		; Pan left, invert value
+	mov @panAmount, a ; Pan = -32 - +32
+	bmi :+
+		; Pan right, invert positive value. Makes A = -32 - 0
 		eor a, #$ff
+		clrc
 		adc a, #1
 	:
-	mov @volumeReduction, a
+	clrc
+	adc a, #32 ; Now A = 0-32, with 32 = Center
+	asl a 
+	asl a ; Pan = $00-$80
+	mov y, ChVolume+x
+	mul ya ; Multiply and shift left 1 so $80 = x1
+	asl a
+	mov a, y
+	rol a
 	
-	mov a, #32
-	cmp @panAmount, #33
-	bcc :+
-		setc
-		sbc a, @volumeReduction ; If panning right, adjust left speaker
-		bcs :+
-			mov a, #0
+	cmp @panAmount, #0
+	bmi :+
+		; Pan Right = VolR at 100%
+		mov SPC_DSPA, CurrentChannelRegister ; ChX Volume L
+		mov SPC_DSPD, a
+		
+		mov a, ChVolume+X
+		inc SPC_DSPA ; Volume R
+		mov SPC_DSPD, a
+		bra :++
 	:
-	mov SPC_DSPA, CurrentChannelRegister ; ChX Volume L
-	mov SPC_DSPD, a
-	
-	mov a, #32
-	cmp @panAmount, #32
-	bcs :+
-		setc
-		sbc a, @volumeReduction ; If panning left, adjust right speaker
-		bcs :+
-			mov a, #0
-	:
-	inc SPC_DSPA ; Volume R
-	mov SPC_DSPD, a
+		; Pan Left = VolL at 100%
+		mov @adjustedVolume, a
+		mov a, ChVolume+X
+		mov SPC_DSPA, CurrentChannelRegister ; ChX Volume L
+		mov SPC_DSPD, a
+		
+		mov a, @adjustedVolume
+		inc SPC_DSPA ; Volume R
+		mov SPC_DSPD, a
+	:	
 	
 	inc SPC_DSPA ; Pitch low byte
 	mov SPC_DSPD, Temp+4
@@ -1515,9 +1391,13 @@ UpdateDspChannel:
 	inc SPC_DSPA
 	inc SPC_DSPA
 	inc SPC_DSPA ; Gain
-	mov a, @channelVolume
+	
+	mov a, ChVolume+x
 	bne :+
 		mov a, #$9c ; Make gain slide down instead of popping out
+		bra :++
+	:
+		mov a, #$7f
 	:
 	mov SPC_DSPD, a ;@channelVolume
 
@@ -1550,29 +1430,10 @@ Octave8:
 DspChannels:
 	.byte $00,$10,$20,$30,$40,$50,$60,$70
 
+.repeat 400
 nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
-nop
+.endrepeat
+
 .align $100
 .assert * = SampleDirectoryAddress, error, "Unaligned track data - Update directory address in both SPC and CPU code. Compiled track images will also not work anymore"
 

@@ -5,9 +5,9 @@
 .segment "RODATA"
 TextAddresses:
 DialogChr:
-.incbin "gfx/font.chr",0,$de0
+.incbin "gfx/font.chr",0,$d00
+.res $e0
 .incbin "gfx/ui.chr"
-.incbin "gfx/box.chr"
 DialogChrEnd:
 CursorSpriteChr:
 .incbin "gfx/cursor.chr"
