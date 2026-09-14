@@ -17,7 +17,7 @@ namespace Patcher;
 public partial class MainWindow : Window
 {
 	private static string[] ValidSampleFiles = new[] { ".brr", ".wav", ".mp3", ".spc", ".sfc", ".smc", ".brrp" };
-	public static int PatchedSamplesStartAddress = 0x081E00; // Get this dynamically by reading from another address in file
+	public static int PatchedSamplesStartAddress = 0x081F00; // Get this dynamically by reading from another address in file
 	public Patch Patch { get; set; }
 	public PreviewPlayer PreviewPlayer { get; set; }
 
