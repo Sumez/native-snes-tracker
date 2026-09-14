@@ -15,6 +15,10 @@ Notes: .res 12 ; Filed with C->B
 NotesSharp: .res 12 ; Filed with # or -
 CursorPositionCol: .res 2
 CursorPositionRow: .res 2
+SelectionStartCol: .res 2
+SelectionStartRow: .res 2
+SelectionEndCol: .res 2
+SelectionEndRow: .res 2
 LastEditedNote: .res 1
 LastEditedInstrument: .res 1
 LastEditedCommand: .res 1
@@ -53,6 +57,12 @@ rtl
 FocusView:
 	jsr LoadView
 
+	ldx #$00ff
+	stx SelectionStartRow
+	stx SelectionStartCol
+	stx SelectionEndRow
+	stx SelectionEndCol
+
 	jsl PrepareTestPatternPlayback
 	ldy #.loword(Name)
 	jsl WriteTilemapHeader
@@ -64,6 +74,13 @@ FocusView:
 	Bind Input_NavigateIn, NavigateFromCursorPosition
 	Bind Input_NavigateBack, ReturnToChainView
 	Bind OnPlaybackStopped, SwitchToSingleNoteMode
+
+	Bind Input_Erase, Erase
+	Bind Input_StartSelection, StartSelection
+	Bind Input_EndSelection, EndSelection
+	Bind Input_CopySelection, Copy
+	Bind Input_CutSelection, Cut
+	Bind Input_Paste, Paste
 
 	jsl ShowCursor_long
 rts
@@ -80,26 +97,17 @@ LoadView:
 	:
 
 	jsl WritePatternTilemapBuffer
-
-	;TODO: do better
-	seta16
-	lda TilemapOffset
-	and #$3C
-	clc
-	adc #Bg3TileMapBase
-	lsr
-	sta Bg3Offset
-	seta8
-	lda #1
-	sta ShowBg3
+	jsr ShowPatternBackdrop
 	
 	jsr GetFirstUnusedInstrument	
 	jsl UpdateHighlight_long
 rts
 .export Pattern_HideView = HideView
 HideView:
+	; Hides the pattern bars on the right side, if cursor is over en empty entry on the chain view on the left
 	jsl WriteEmptyTilemapBuffer
-	stz ShowBg3
+	;stz ShowBg3
+	jsr ShowClearBackdrop
 rts
 
 .export GetFirstUnusedInstrumentOffset
@@ -512,66 +520,83 @@ NavigateFromCursorPosition:
 jmp PlayMosaic
 
 
+StartSelection:
+	lda CursorPositionRow
+	sta SelectionStartRow
+	sta SelectionEndRow
+	lda CursorPositionCol
+	sta SelectionStartCol
+	sta SelectionEndCol
+jmp ShowCursor
+
+Erase:
+	ldx CursorPositionRow
+	lda CursorPositionCol
+	cmp #2
+	bcc :++
+		
+		lda PatternCommands,X
+		beq :+
+			sta LastEditedCommand
+			lda PatternCommandParams,X
+			sta LastEditedCommandParam
+		:
+		stz PatternCommandParams,X
+		stz PatternCommands,X
+		jmp NoteWasChanged
+	:
+
+	lda PatternNotes,x
+	cmp #$ff
+	beq @isEmpty
+		
+		cmp #$fe
+		beq :+
+			; Not empty, and not note-off, save note+instr in memory
+			sta LastEditedNote
+			lda PatternInstruments,x
+			sta LastEditedInstrument
+		:
+		
+		lda #$ff
+		bra :+
+	@isEmpty:
+		; If bar is already empty, add KEYOFF
+		lda #$fe
+	:
+	sta PatternNotes,x
+	stz EditMode
+	jsr NoteWasChanged
+jmp ShowCursor
+
+EndSelection:
+	ldx TilemapOffset
+	stx CursorOffset
+	jsr GetSelectionCoordinates
+	jsr ClearSelectionArea
+	lda #$ff
+	sta SelectionStartRow
+rts
+
 HandleInput:
 
-	lda ButtonPushed
-	bit #<KEY_X ; Key X removes current note
-	beq @noX
-	
-			ldx CursorPositionRow
-			lda CursorPositionCol
-			cmp #2
-			bcc :++
-				
-				lda PatternCommands,X
-				beq :+
-					sta LastEditedCommand
-					lda PatternCommandParams,X
-					sta LastEditedCommandParam
-				:
-				stz PatternCommandParams,X
-				stz PatternCommands,X
-				jmp NoteWasChanged
-			:
-
-			lda PatternNotes,x
-			cmp #$ff
-			beq @isEmpty
-				
-				cmp #$fe
-				beq :+
-					; Not empty, and not note-off, save note+instr in memory
-					sta LastEditedNote
-					lda PatternInstruments,x
-					sta LastEditedInstrument
-				:
-				
-				lda #$ff
-				bra :+
-			@isEmpty:
-				; If bar is already empty, add KEYOFF
-				lda #$fe
-			:
-			sta PatternNotes,x
-			stz EditMode
-			jsr NoteWasChanged
-			jmp ShowCursor
-			;RETURNS - no more inputs read this frame
-	@noX:
-	
 	lda ButtonStates+1 ; Key Y enters edit mode while held
 	bit #>KEY_Y
 	bne :+
 		lda EditMode
 		beq @continue
+			; Let go of Y while in edit mode
 			stz EditMode
 			jsr CutCurrentlyPlayingNote
 			jsr ShowCursor
 			bra @continue
 	:
+	lda ButtonPushed+1 ; Key Y enters edit mode while held
+	bit #>KEY_Y
+	beq @continue
 		lda EditMode
 		bne @continue
-
+			; Pushed Y while not in edit mode
 			lda #1
 			sta EditMode
 
@@ -877,13 +902,15 @@ MoveCursorDown:
 		jmp ShowCursor
 	:
 	
-	jsr Chain_MovePhraseDown
-	beq :+
-		stz CursorPositionRow
-		bra :++
-	:
-		lda #$0f
-		sta CursorPositionRow
+	bit SelectionStartRow ; Don't move to next phrase if currently making a selection
+	bpl :+
+		jsr Chain_MovePhraseDown
+		beq :+
+			stz CursorPositionRow
+			bra :++
+		:
+			lda #$0f
+			sta CursorPositionRow
 	:
 jmp ShowCursor
 
@@ -892,13 +919,16 @@ MoveCursorUp:
 	bmi :+
 		jmp ShowCursor
 	:
-	jsr Chain_MovePhraseUp
-	bne :+
-		stz CursorPositionRow
-		bra :++
-	:
-		lda #$0f
-		sta CursorPositionRow
+	
+	bit SelectionStartRow ; Don't move to next phrase if currently making a selection
+	bpl :+
+		jsr Chain_MovePhraseUp
+		beq :+
+			lda #$0f
+			sta CursorPositionRow
+			bra :++
+		:
+			stz CursorPositionRow
 	:
 jmp ShowCursor
 
@@ -927,37 +957,275 @@ ShowCursor:
 	lda #11
 	sta HighlightLength
 
+	bit SelectionStartRow
+	bmi :+
+		jsr GetSelectionCoordinates
+		jsr ClearSelectionArea
+
+		lda CursorPositionRow
+		sta SelectionEndRow
+		lda CursorPositionCol
+		sta SelectionEndCol
+		jsr GetSelectionCoordinates
+		jsr MarkSelectionArea
+	:
+
 	lda CursorPositionRow
 	sta CursorY
-	lda CursorPositionCol
-	bne @notnote
-		lda #0
-		sta CursorX
-		lda #1
-		bra :++
-	@notnote:
-		cmp #1
-		bne @notins
-		lda #4
-		sta CursorX
-		bra :+
-	@notins:
-		cmp #2
-		bne @notcmdId
-		lda #7
-		sta CursorX
-		lda #1
-		bra :++
-	@notcmdId:
-		lda #8
-		sta CursorX
-		:
-		lda #0
-	:
+	ldx CursorPositionCol
+	lda f:CursorPositions,x
+	sta CursorX
+	lda f:CursorTypes,x
 	sta CursorSize
 	
 	lda #2
 jmp UpdateCursorSpriteAndHighlight
+
+CursorPositions:
+.byte 0,4,7,8
+CursorTypes:
+.byte 1,0,1,0
+CursorWidths:
+.byte 3,2,1,2
+
+GetSelectionIndexes:
+	;0 = X, 2 = Y, 4 = Width, 6 = Height
+	lda SelectionEndRow
+	sta Selection_Y
+	sec
+	sbc SelectionStartRow
+	bcs :+
+		; Start was higher than End, so reverse the subtraction but keep the value stored in 2
+		lda SelectionStartRow
+		sec
+		sbc SelectionEndRow
+		sta Selection_Height
+		bra :++
+	:
+		sta Selection_Height
+		lda SelectionStartRow
+		sta Selection_Y
+	:
+
+	lda SelectionEndCol
+	cmp SelectionStartCol
+	bcs :+
+		; Start was higher than End
+		sta Selection_X
+		lda SelectionStartCol
+		sta Selection_Width ; Use width as "EndX" for now
+		bra :++
+	:
+		sta Selection_Width
+		lda SelectionStartCol
+		sta Selection_X
+	:
+rts
+GetSelectionCoordinates:
+	jsr GetSelectionIndexes
+	; Get tile size from LUTs
+	stz Selection_X+1
+	ldx Selection_X
+	lda f:CursorPositions,X
+	sta Selection_X
+
+	stz Selection_Width+1
+	ldx Selection_Width
+	lda f:CursorPositions,X
+	clc
+	adc f:CursorWidths,X
+	sec
+	sbc Selection_X ; Subtract X from XEnd to give width in tiles
+	sta Selection_Width ; width
+
+	inc Selection_Height ; Add 1 (selection includes last cell)
+rts
+
+Copy:
+@lastCol = 0
+@rowCount = 3
+@startX = 4;+5
+@colCount = 6
+
+	phb
+	lda #^Clipboard
+	pha
+	plb
+
+	lda #3 ; Phrase data
+	sta Clipboard
+	
+	jsr GetSelectionIndexes
+	lda Selection_Height
+	inc a
+	sta Clipboard+1
+	lda Selection_Width
+	sec
+	sbc Selection_X
+	inc
+	sta Clipboard+2
+	sta @colCount
+	
+	ldy #3
+	lda #0
+	xba ; Keep upper 8 bits of A clean
+	lda Selection_Y
+	tax
+	stx @startX ; X is necessary for the jump table, so use X as the read index, since it's reset in every inner loop
+	lda Selection_X ; each column index is the copy/paste "mode"
+	asl
+	
+	@colLoop:
+		sta @lastCol
+		sta Clipboard,Y
+		tax
+		iny
+		lda Clipboard+1
+		sta @rowCount
+		jsr (.loword(@CopyMethods),X)
+	
+		lda @lastCol
+		inc a
+		inc a
+		dec @colCount
+	bne @colLoop
+	
+	plb
+rts
+.macro CopyRoutine Source
+.local @rowLoop
+	ldx @startX
+	@rowLoop:
+		lda Source,X
+		inx
+		sta Clipboard,Y
+		iny
+		dec @rowCount
+	bne @rowLoop
+rts
+.endmacro
+@CopyMethods: .addr @CopyNotes, @CopyInstruments, @CopyCommands, @CopyCommandValues
+@CopyNotes: CopyRoutine PatternNotes
+@CopyInstruments: CopyRoutine PatternInstruments
+@CopyCommands: CopyRoutine PatternCommands
+@CopyCommandValues: CopyRoutine PatternCommandParams
+
+Paste:
+@rowCount = 3
+@colCount = 6
+
+
+	lda f:Clipboard
+	cmp #3 ; Phrase data
+	beq :+
+		rts
+	:
+
+	phb
+	lda #^Clipboard
+	pha
+	plb
+
+	lda #0
+	xba ; Clean top 8 bytes of AB
+	lda Clipboard+2
+	sta @colCount
+	ldy #3
+	@colLoop:
+		lda Clipboard,Y
+		tax
+		iny
+		lda Clipboard+1
+		sta @rowCount
+		jsr (.loword(@PasteMethods),X)
+		dec @colCount
+	bne @colLoop
+
+	plb
+jmp NoteWasChanged ; TODO: Call changed event for each pasted row, but only redraw the tiles once, so playback plays correctly
+
+.macro PasteRoutine Target, ClearRow
+.local @rowLoop
+	ldx CursorPositionRow
+	@rowLoop:
+		lda Clipboard,Y
+		iny
+		sta Target,X
+		.if ClearRow = 1
+			stz PatternInstruments,X
+			stz PatternCommands,X
+			stz PatternCommandParams,X
+		.endif
+		inx
+		dec @rowCount
+	bne @rowLoop
+rts
+.endmacro
+@PasteMethods: .addr @PasteNotes, @PasteInstruments, @PasteCommands, @PasteCommandValues
+@PasteNotes: PasteRoutine PatternNotes, 1
+@PasteInstruments: PasteRoutine PatternInstruments, 0
+@PasteCommands: PasteRoutine PatternCommands, 0
+@PasteCommandValues: PasteRoutine PatternCommandParams, 0
+
+
+Cut:
+@rowCount = 3
+@startX = 4;+5 ; Reused from Copy
+@colCount = 6
+	jsr Copy
+
+	lda #0
+	xba ; Clean top 8 bytes of AB
+	lda f:Clipboard+2
+	sta @colCount
+	ldy #3
+	@colLoop:
+		tyx
+		lda f:Clipboard,X
+		tax
+		iny
+		lda f:Clipboard+1
+		sta @rowCount
+		jsr (.loword(@ClearMethods),X)
+		dec @colCount
+	bne @colLoop
+
+jmp NoteWasChanged ; TODO: Call changed event for each pasted row, but only redraw the tiles once, so playback plays correctly
+
+@ClearMethods: .addr @ClearNotes, @ClearInstruments, @ClearCommands, @ClearCommandValues
+@ClearNotes:
+ 	ldx @startX
+ 	lda #$ff
+	@noteRowLoop:
+		sta PatternNotes,X
+		stz PatternInstruments,X
+		stz PatternCommands,X
+		stz PatternCommandParams,X
+		inx
+		iny
+		dec @rowCount
+	bne @noteRowLoop
+rts
+@ClearInstruments:
+	@instrumentRowLoop:
+		iny
+		dec @rowCount
+	bne @instrumentRowLoop
+rts
+@ClearCommands:
+@ClearCommandValues:
+ 	ldx @startX
+	@commandRowLoop:
+		stz PatternCommands,X
+		stz PatternCommandParams,X
+		inx
+		iny
+		dec @rowCount
+	bne @commandRowLoop
+rts
+
+jmp NoteWasChanged
+	
 
 StartPlayback:
 	lda CurrentPhraseIndex
@@ -974,7 +1242,7 @@ UpdateBeatHighlight:
 	ldy #0
 	lda CurrentPhraseIndex
 	:
-		cmp Playback_CurrentPhraseOfChannel,y
+		cmp Playback_CurrentPhraseOfChannel,y ; Check if a channel (Y) is playing the current phrase
 		bne :+
 			lda Playback_CurrentBeatRow
 			seta16

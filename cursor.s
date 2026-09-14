@@ -123,3 +123,56 @@ UpdateCursorSpriteAndHighlight:
 	sta RefreshOam
 	
 rts
+
+MarkSelectionArea:
+	lda #$de
+	jmp fillSelectionArea
+ClearSelectionArea:
+	lda #$df
+fillSelectionArea:
+
+	pha ; Store A (tile index) until later
+
+	stz 4+1 ; Ensure 8bit value before loading it into 16bit Y
+	clc
+	asl 4 ; Double width because each tile is 2 bytes
+	
+	lda #^BackdropTilemapBuffer
+	sta 9 ; 7,8,9 = Indirect address to tilemap buffer
+	seta16
+	lda 0 ; X coord
+	and #$ff
+	asl
+	sta 7
+	lda 2 ; Y coord
+	and #$ff
+	xba
+	lsr
+	lsr ; Row start coordinate
+	adc #(.loword(BackdropTilemapBuffer) - 2) ; Subtract 2 because Y register rabges from #2-(width*2)
+	adc CursorOffset
+	adc 7
+	
+	sta 7 ; 7,8,9 = Indirect address to tilemap buffer
+	seta8
+	
+	pla	; Recover tile index
+	@loopY:
+		ldy 4 ; width
+		@loopX:
+			sta [7],Y
+			dey
+			dey
+		bne @loopX
+		pha
+			; Add 64 to pointer (next row)
+			seta16
+			lda 7
+			clc
+			adc #64
+			sta 7
+			seta8
+		pla
+		dec 6 ; height
+	bne @loopY
+rts

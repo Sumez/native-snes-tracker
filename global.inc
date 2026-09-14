@@ -4,6 +4,8 @@
 MAX_INSTRUMENTS = 53
 
 .define TilemapBufferSegment "BSS7E"
+.define ClipboardSegment "BSS7E"
+.define UnusedItemsSegment "BSS7E"
 .define CompiledPlaybackDataSegment "BSS7F"
 
 ;Sort this out
@@ -14,12 +16,18 @@ MAX_INSTRUMENTS = 53
 .global SONG, CHAINS, PHRASES_1, PHRASES_2, INSTRUMENTS, SAMPLES
 .globalzp Input_CustomHandler, Input_NavigateIn, Input_NavigateBack, Input_MoveLeft, Input_MoveUp, Input_MoveRight, Input_MoveDown
 .globalzp Input_StartPlayback, OnPlaybackStopped
-.global CurrentScreen, IsPlaying, CompiledPattern, TilemapBuffer, GuiTilemapBuffer, UiTilemapBuffer, EditMode, UnusedInstruments
+.globalzp Input_StartSelection, Input_EndSelection, Input_CopySelection, Input_CutSelection, Input_Paste, Input_Erase, Input_Clone
+.global Clipboard
+.global CurrentScreen, ExpectDoubleTap, IsPlaying, CompiledPattern, TilemapBuffer, GuiTilemapBuffer, ShowClearBackdrop, ShowPatternBackdrop, BackdropTilemapBuffer, EditMode, UnusedInstruments
 .global Notes, Octaves, NotesSharp
 .globalzp SingleNotePatternOffsetInSpcSource ; Unsure about these
 
 ; Temp variables
 LoadView_TilemapOffset = 0
+Selection_X = 0
+Selection_Y = 2
+Selection_Width = 4
+Selection_Height = 6
 
 ; Global routines
 .global NavigateToScreen, NavigateToPreviousScreen, WriteTilemapHeader, WriteTilemapHeaderId
@@ -37,6 +45,7 @@ LoadView_TilemapOffset = 0
 ; Fx stuff
 .global HighlightRow, HighlightChainRow, HighlightChannel, ShowBg3, Bg3Offset
 .global PlayMosaic, Bop
+.global MarkSelectionArea, ClearSelectionArea
 
 .macro _PrintHexNumber Target, Pad
 .local @notZero

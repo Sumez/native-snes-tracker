@@ -106,7 +106,7 @@
     <Pipeline>
       <Type>tilemap.custom</Type>
       <Output>gfx/font.inc</Output>
-      <LastProcessed>2024-09-18T23:26:11.6542594+02:00</LastProcessed>
+      <LastProcessed>2026-06-16T22:32:34.3167217+02:00</LastProcessed>
       <Property>
         <Key>script-type</Key>
         <Value>Python</Value>
@@ -146,7 +146,7 @@
       <Output>gfx/cursor.chr</Output>
       <Output>gfx/cursor.pal</Output>
       <Output>gfx/cursor.map</Output>
-      <LastProcessed>2024-09-18T23:26:11.6683507+02:00</LastProcessed>
+      <LastProcessed>2026-09-11T15:50:18.8599116+02:00</LastProcessed>
       <Property>
         <Key>DiscardRedundant</Key>
         <Value>0</Value>
@@ -419,7 +419,7 @@
     <Pipeline>
       <Type>tilemap.custom</Type>
       <Output>gfx/gui.inc</Output>
-      <LastProcessed>2024-09-13T10:14:18.9388358+02:00</LastProcessed>
+      <LastProcessed>2026-09-11T15:50:19.0126205+02:00</LastProcessed>
       <Property>
         <Key>script-type</Key>
         <Value>Python</Value>

@@ -6,10 +6,16 @@
 .segment "CODE7"
 Name: .byte "Chain_-_",$ff
 
+.segment UnusedItemsSegment
+UnusedPhrases: .res $100
+
 .segment "BSS"
 
 ;Needs init:
 CursorRow: .res 2
+CursorColumn: .res 2
+SelectionStart: .res 1
+SelectionEnd: .res 1
 LastEditedPhrase: .res 1
 LastEditedTranspose: .res 1
 
@@ -32,12 +38,16 @@ Init:
 	
 	ldx #0
 	stx CursorRow
+	stx CursorColumn
 rtl
 
 .export Chain_FocusView = FocusView
 FocusView:
 	jsr LoadView
 	
+	lda #$ff
+	sta SelectionStart
+
 	ldy #.loword(Name)
 	jsl WriteTilemapHeader
 	lda CurrentChainIndex
@@ -48,6 +58,14 @@ FocusView:
 	Bind Input_NavigateIn, NavigateToPhrase
 	Bind Input_NavigateBack, NavigateToSong
 	Bind OnPlaybackStopped, NoAction
+	
+	Bind Input_Erase, Erase
+	Bind Input_Clone, Clone
+	Bind Input_StartSelection, StartSelection
+	Bind Input_EndSelection, EndSelection
+	Bind Input_CopySelection, Copy
+	Bind Input_CutSelection, Cut
+	Bind Input_Paste, Paste
 	
 	jsl UpdateHighlight_long
 	jsl ShowCursor_long
@@ -128,7 +146,7 @@ LoadGlobalData:
 rtl
 UpdateGlobalData:
 	; Copy temp memory to selected chain
-	; TODO: Update only currently selected phrase entry
+	; TODO: Update only currently selected phrase entry (more if cut/paste)
 	ldx CurrentChainIndexInGlobalSong
 	ldy #0
 	@loop:
@@ -140,7 +158,53 @@ UpdateGlobalData:
 		inx
 		iny
 		cpy #$10
-	bne @loop	
+	bne @loop
+rtl
+.export UpdateUnusedPhrasesGlobal
+UpdateUnusedPhrasesGlobal:
+; This takes almost 1 frame, so only run it while loading song
+	phb
+	lda #^UnusedPhrases
+	pha
+	plb
+	setxy8
+	ldx #0
+	:
+		stz UnusedPhrases,X
+		inx
+	bne :-
+
+	lda #^CHAINS
+	pha
+	plb
+	ldy #0
+	lda #$ff
+	:
+		@offset .set $000
+		.repeat $20
+			ldx CHAINS+@offset,y
+			sta f:UnusedPhrases,X
+			@offset .set @offset + $100
+		.endrepeat
+		iny
+		iny
+	beq :+
+		jmp :-
+	:
+	setxy16	
+	ldx #@offset
+	plb
+rtl
+UpdateUnusedPhrases:
+	setxy8
+	ldy #$0f
+	lda #$ff
+	:
+		ldx PhraseIndexes,y
+		sta f:UnusedPhrases,X
+		dey
+	bpl :-
+	setxy16
 rtl
 
 WriteTilemapBuffer:
@@ -162,6 +226,19 @@ WriteTilemapBuffer:
 			lda #$1f
 			sta f:TilemapBuffer+2,x
 		:
+		
+		lda TransposeValues,Y
+		beq :+
+			; TODO: Write number with +/- notation
+			PrintHexNumber TilemapBuffer+6
+			bra :++
+		:
+			; Empty cell	
+			lda #$3F
+			sta f:TilemapBuffer+6,x
+			sta f:TilemapBuffer+8,x
+		:
+		
 
 		seta16
 		txa
@@ -221,40 +298,206 @@ NavigateToPhrase:
 	:
 jmp PlayMosaic
 
+GetNextUnusedPhrase:
+
+	lda #0
+	xba
+	lda PhraseIndexes,X ; Start looking from the currently selected chain index
+	tax
+	inx ; Always start checking the next index
+	
+	phb
+
+	lda #^PHRASES_1
+	pha
+	plb
+	@loop1:
+		cpx #$080
+		bcs @nextLoop ; Look in the phrase_2 loop if X is $80 or higher
+		lda f:UnusedPhrases,x
+		bne :+
+			; Seems unused. Read values of chain to check if it is
+			jsr @ReturnIfPhraseHasData
+			; If routine returns normally, proceed to check next chain
+		:
+		inx
+	bra @loop1
+	@nextLoop:
+	
+	lda #^PHRASES_2
+	pha
+	plb
+	@loop2:
+		cpx #$100
+		beq @nothingFound
+		lda f:UnusedPhrases,x
+		bne :+
+			; Seems unused. Read values of chain to check if it is
+			jsr @ReturnIfPhraseHasData
+			; If routine returns normally, proceed to check next chain
+		:
+		inx
+	bra @loop2
+	
+	@nothingFound:
+	lda #$ff
+	plb
+rts
+@ReturnIfPhraseHasData:
+	seta16
+	txa
+	and #$00ff
+	; Every Phrase is $40 bytes, so shift left 6 times (x64)
+	asl
+	asl
+	asl
+	asl
+	asl
+	asl
+	and #$1FFF ; Only used the lower $2000 bytes. If the top bit is set (128+), current DB index should already be changed to PHRASES_2
+	tay
+	seta8
+	lda #$ff
+	.assert .loword(PHRASES_1) = .loword(PHRASES_2), error, "Code would be unable to read PHRASES_2 using this method" ; Requirement for this trick to work
+	@offset .set 0
+	.repeat 16
+		and PHRASES_1+@offset+1,Y 
+		and PHRASES_1+@offset+2,Y
+	@offset .set @offset + 3
+	.endrepeat
+	cmp #$ff
+	beq :+
+		; Had data, so return and check next
+		rts
+	:	
+	; Return value of X in the A register, reset index sizes, and jump up one subroutine before returning, to stop looping through the unused index
+	txa
+	plx ; Dummy pull from stack to skip parent routine
+	plb
+rts
+
+Erase:
+	ldx CursorRow
+	lda PhraseIndexes,x
+	cmp #$ff
+	beq :+ ; Don't do anything if cell is already empty
+		sta LastEditedPhrase
+		lda TransposeValues,x
+		sta LastEditedTranspose
+		lda #$ff
+		sta PhraseIndexes,x
+		stz TransposeValues,x
+		stz EditMode
+		jsr PhraseIndexWasChanged
+		jmp ShowCursor
+	:
+rts
+
+Clone:
+	ldx CursorRow
+	lda PhraseIndexes,x
+	cmp #$ff
+	beq :+ ; Don't do anything if cell is already empty
+		sta 0
+		jsr GetNextUnusedPhrase
+		cmp #$ff
+		beq :+ ; No unused phrase found
+		
+			ldx CursorRow
+			sta f:PhraseIndexes,x
+			sta LastEditedPhrase
+			stz ExpectDoubleTap
+			jsr Clone0IntoA
+			jmp PhraseIndexWasChanged
+	:
+rts
+
+Clone0IntoA: ; Clone data from the chain index stored in $00 into the one stored in A
+; 0-1-2: Source (long) address
+; 3-4-5: Target (long) address
+	seta16
+	and #$00ff
+	asl
+	asl
+	asl
+	asl
+	asl
+	asl
+	ldx #(^PHRASES_1<<8)
+	bit #$2000
+	beq :+
+		ldx #(^PHRASES_2<<8)
+	:
+	stx 4 ; Stores the bank byte in 5
+	and #$1fff
+	clc
+	adc #.loword(PHRASES_1)
+	sta 3
+
+	.assert .loword(PHRASES_1) = .loword(PHRASES_2), error, "Phrases 1 and 2 have different short addresses, so the code needs to account for that"
+	
+	lda 0
+	and #$00ff
+	asl
+	asl
+	asl
+	asl
+	asl
+	asl
+	ldx #(^PHRASES_1<<8)
+	bit #$2000
+	beq :+
+		ldx #(^PHRASES_2<<8)
+	:
+	stx 1 ; Stores the bank byte in 2
+	and #$1fff
+	clc
+	adc #.loword(PHRASES_1)
+	sta 0
+	seta8
+	
+	ldy #0
+	@loop:
+		lda [0],Y
+		sta [3],Y
+		iny
+		cpy #64
+	bne @loop
+rts
+
+StartSelection:
+	lda CursorRow
+	sta SelectionStart
+	sta SelectionEnd
+jmp ShowCursor
+
+EndSelection:
+	ldx TilemapOffset
+	stx CursorOffset
+	jsr GetSelectionCoordinates
+	jsr ClearSelectionArea
+	lda #$ff
+	sta SelectionStart
+rts
+			
 ; TODO: Set pointer variables to all the individual handlers like moveup, down, left, right, when loading the view
 HandleInput:
 
-	lda ButtonPushed
-	bit #<KEY_X ; Key X removes current phrase
-	beq :+
-		
-		ldx CursorRow
-		lda PhraseIndexes,x
-		cmp #$ff
-		beq :+ ; Don't do anything if cell is already empty
-			
-			sta LastEditedPhrase
-			lda TransposeValues,x
-			sta LastEditedTranspose
-			lda #$ff
-			sta PhraseIndexes,x
-			stz EditMode
-			jsr PhraseIndexWasChanged
-			jmp ShowCursor
-			;RETURNS - no more inputs read this frame
-	:
-	
 	lda ButtonStates+1 ; Key Y enters edit mode while held
 	bit #>KEY_Y
 	bne :+
 		lda EditMode
 		beq @continue
 			stz EditMode
+			jsl UpdateUnusedPhrases
 			jsr ShowCursor
 			bra @continue
 	:
+	lda ButtonPushed+1
+	bit #>KEY_Y ; Activate edit mode on Y push, not if it's held while exiting another mode
+	beq @continue
 		lda EditMode
-		bne @continue
+		bne @continue ; Already in edit mode
 
 			lda #1
 			sta EditMode
@@ -263,14 +506,38 @@ HandleInput:
 			ldx CursorRow
 			lda PhraseIndexes,x
 			cmp #$ff
-			bne :+
-				; No phrase exists. Use last edited
+			beq :++
+				; Phrase index exists. Don't do anything yet, but listen for doubletap and store the index to recall later
+				bit ExpectDoubleTap
+				bmi :+
+					sta LastEditedPhrase
+					lda TransposeValues,x
+					sta LastEditedTranspose
+					bra @showCursor
+				:
+
+				jsr GetNextUnusedPhrase ; This can take a while
+				cmp #$ff
+				beq @showCursor ; No unused phrase found (wow)
+				
+				ldx CursorRow
+				sta PhraseIndexes,x
+				sta LastEditedPhrase
+				lda TransposeValues,x
+				sta LastEditedTranspose
+				stz ExpectDoubleTap
+				jsr PhraseIndexWasChanged
+				bra @showCursor
+				
+			:
+				; No phrase index exists. Use last edited
+				dec ExpectDoubleTap ; listen for double tap on next Y push
 				lda LastEditedPhrase
 				sta PhraseIndexes,x
 				lda LastEditedTranspose
 				sta TransposeValues,x
 				jsr PhraseIndexWasChanged
-			:
+			@showCursor:
 			jsr ShowCursor
 
 	@continue:
@@ -283,6 +550,12 @@ HandleInput:
 @EditMode:
 
 	lda ButtonPushed+1
+	bit #>KEY_DOWN|>KEY_UP|>KEY_LEFT|>KEY_RIGHT
+	bne :+
+		rts ; No navigation pushed
+	:
+	stz ExpectDoubleTap ; If any value edited, reset doubletap wait
+
 	bit #>KEY_DOWN
 	beq :+
 		lda #(256-$10)
@@ -308,6 +581,12 @@ rts
 @Navigation:
 
 	lda ButtonPushed+1
+	bit #>KEY_DOWN|>KEY_UP|>KEY_LEFT|>KEY_RIGHT
+	bne :+
+		rts ; No navigation pushed
+	:
+	stz ExpectDoubleTap ; If any navigation pushed, reset doubletap wait
+
 	bit #>KEY_DOWN
 	beq :+
 		jmp MoveCursorDown
@@ -316,14 +595,13 @@ rts
 	beq :+
 		jmp MoveCursorUp
 	:
-	
 	bit #>KEY_LEFT
 	beq :+
-;		jmp MoveCursorLeft
+		jmp MoveCursorLeft
 	:
 	bit #>KEY_RIGHT
 	beq :+
-;		jmp MoveCursorRight
+		jmp MoveCursorRight
 	:
 
 rts
@@ -374,6 +652,21 @@ MoveCursorUp:
 		sta CursorRow
 	:
 jmp ShowCursor
+MoveCursorRight:
+	lda CursorColumn
+	beq :+
+		rts
+	:
+	inc CursorColumn
+jmp ShowCursor
+MoveCursorLeft:
+	dec CursorColumn
+	bpl :+
+		inc CursorColumn
+		rts
+	:
+jmp ShowCursor
+
 .export Chain_MovePhraseDown = MovePhraseDown, Chain_MovePhraseUp = MovePhraseUp
 MovePhraseDown:
 	ldx CursorRow
@@ -417,7 +710,21 @@ ShowCursor:
 	lda #2
 	sta HighlightLength
 
-	lda #0
+	lda SelectionStart
+	bmi :+
+		jsr GetSelectionCoordinates
+		jsr ClearSelectionArea
+
+		lda CursorRow
+		sta SelectionEnd
+		jsr GetSelectionCoordinates
+		jsr MarkSelectionArea
+	:
+
+	lda CursorColumn
+	beq :+
+		lda #3
+	:
 	sta CursorX
 	
 	lda CursorRow
@@ -427,6 +734,109 @@ ShowCursor:
 
 	lda #0
 jmp UpdateCursorSpriteAndHighlight
+
+GetSelectionCoordinates:
+	;0 = X, 2 = Y, 4 = Width, 6 = Height
+	lda SelectionEnd
+	sta 2
+	sec
+	sbc SelectionStart
+	bcs :+
+		; Start was higher than End, so reverse the subtraction but keep the value stored in 2
+		lda SelectionStart
+		sec
+		sbc SelectionEnd
+		sta 6
+		bra :++
+	:
+		sta 6
+		lda SelectionStart
+		sta 2
+	:
+
+	stz 0
+	lda #5
+	sta 4
+	inc 6
+rts
+
+Copy:
+	@rowCount = 0
+	; Selection_Y is 2-3 and must be kept unaltered for the DeleteCopied routine
+
+	jsr GetSelectionCoordinates
+	stz Selection_Y+1
+	ldy Selection_Y
+
+	lda #2 ; 2 = Chain data
+	sta f:Clipboard
+	lda Selection_Height
+	sta f:Clipboard+1
+	sta @rowCount
+	ldx #2
+
+	@rowLoop:
+		lda PhraseIndexes,Y
+		sta f:Clipboard,X
+		inx
+		lda TransposeValues,Y
+		sta f:Clipboard,X
+		inx
+		iny
+		dec @rowCount
+	bne @rowLoop
+rts
+
+DeleteCopied:
+	@rowCount = 0 ; Expect @rowCount(0-1) and Selection_Y (2-3) to remain unaltered since the copy routine!
+	
+	lda f:Clipboard+1
+	sta @rowCount
+	ldy Selection_Y
+	@rowLoop:
+		lda #$ff
+		sta PhraseIndexes,Y
+		lda #0
+		sta TransposeValues,Y
+		iny
+		dec @rowCount
+	bne @rowLoop
+rts
+
+
+Cut:
+	jsr Copy
+	jsr DeleteCopied
+jmp PhraseIndexWasChanged
+
+Paste:
+	@colCount = 0
+	@rowCount = 2
+	@yTemp = 8
+
+	lda f:Clipboard
+	cmp #2 ; Chain data
+	beq :+
+		rts
+	:
+
+	lda f:Clipboard+1
+	sta @rowCount
+
+	ldy CursorRow
+	ldx #2
+	@rowLoop:
+		lda f:Clipboard,X
+		sta PhraseIndexes,Y
+		inx
+		lda f:Clipboard,X
+		sta TransposeValues,Y
+		inx
+		iny
+		dec @rowCount
+	bne @rowLoop
+	jsl UpdateUnusedPhrases
+jmp PhraseIndexWasChanged
 
 
 CopyCurrentSongToSpcBuffer:

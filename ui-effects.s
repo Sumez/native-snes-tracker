@@ -7,7 +7,7 @@ MosaicTimer: .res 1
 HighlightRowIndex: .res 2
 ChannelHighlights: .res 8
 ChainHighlight: .res 1
-ShowBg3: .res 1
+ShowBg3: .res 1 ; TODO: BG3 is always shown, so this should refer to whether the marked rows on phrase view are shown (and maybe they should be another layer)
 Bg3Offset: .res 2
 
 .segment "CODE7"
@@ -85,9 +85,11 @@ Update_Vblank:
 		sta CGADDR
 		writeColor @beatRowPlaying
 		
-		ldx HighlightRowIndex
-		bmi :+
-		LoadBlockToOffsetVRAM HighlightTiles, HighlightRowIndex, $18
+		lda ShowBg3
+		beq :+
+			ldx HighlightRowIndex
+			bmi :+
+				LoadBlockToOffsetVRAM HighlightTiles, HighlightRowIndex, $18
 	:
 	
 	lda BopTimer
@@ -99,13 +101,13 @@ Update_Vblank:
 	
 	:
 	
-	lda ShowBg3
-	beq :+
+	;lda ShowBg3
+	;beq :+
 		lda #%00010111
-		bra :++
-	:
-		lda #%00010011
-	:
+	;	bra :++
+	;:
+	;	lda #%00010011
+	;:
 	sta BLENDMAIN
 
 rts
@@ -147,7 +149,7 @@ rts
 
 HighlightTiles:
 .repeat $20
-.word $08de
+.word $14de
 .endrepeat
 rts
 

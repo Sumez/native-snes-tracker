@@ -14,6 +14,9 @@ The control scheme is optimized to the SNES's 12-button D-pad. If you are using 
 
 ### Immediate roadmap:
 
+- Known bugs
+    - Navigating out of the instrument view after selecting a new sample often results in a crash
+    - When playing back a row in song view, you'll some times experience a visual delay. This happens if every chain on the row is different, making it take a long time to load it into the APU
 - ✅ Revised CPU controlled playback <sup>Done</sup>
     - ~~Start playback from any location in song~~ <sup>Done</sup>
     - ~~Pointer showing where in the song you are~~ <sup>Done</sup>
@@ -22,12 +25,20 @@ The control scheme is optimized to the SNES's 12-button D-pad. If you are using 
     - ~~`Only transfer one phrase per channel at a time to the APU, buffer one beat before it changes in SPC code`~~ <sup>Done</sup>
 - Improved navigation
     - ~~Show adjacent views (chain preview from song view - chain and phrase are always visible at the same time)~~ <sup>Done</sup>
+    - ~~Scroll up/down on song view~~ <sup>Done</sup>
+        - Sprite based(?) discrete index numbers to the left of every 4th row (00..04..08..0C..10..14)
     - "Channel bar" in the top, facilitates navigating between channels using L/R buttons (probably)
     - ~~Navigate up down between sequential chains and phrases based on where in the song you are~~ <sup>Done</sup>
-    - Fresh insert on song or chain view will insert the next unused index
-    - Clone/deepclone inserted chains or phrases
-    - Hold Delete while moving cursor to delete multiple
+    - ~~Select multiple and copy/paste~~ <sup>Done</sup>
+        - Bug: Pasting into a phrase while playback is active will not update the playing phrase, only the note where the cursor was
+    - ~~Double tap selects next unused index~~
+    - ~~Clone/deepclone inserted chains or phrases~~ <sup>Slim clone supported. Deep clone postponed until someone requests it</sup>
     - Make it visible ("greyed out"?) that a chain/phrase/instrument is "empty"/uncreated where selecting it
+    - Hold Delete while moving cursor to delete multiple
+    - Allow removing an already empty row in a song view channel to move everything below it up by one. Ideally a way to insert new row as well
+- Playback adjustments according to UI
+    - Select+Start should only play current song row when in the chain view
+    - When a channel in the song playback hits an empty row, it should just loop back to the top used row before an unused one
 - Echo filter
     - Set echo variables and enable per-channel using commands
     - Control *maximum* echo delay using a global variable - restricts usage of that specific command
@@ -35,9 +46,13 @@ The control scheme is optimized to the SNES's 12-button D-pad. If you are using 
     - Custom FIR filters (sound modulation)
 - Rudimentary GUI
     - More pleasant temporary graphics <sup>In progress</sup>
+    - Save up sprite slots by having 32x32 sprites (a row playing in song view on all channels will now use 16 sprites plus potentially 2 from the cursor. Could easily be just 9)
     - Visible UI hints for easier navigation
     - Row and column labels <sup>In progress</sup>
-    - Highlight columns instead of rows on song view
+        - Use sprites to display row indexes on song view?
+    - Show more useful information on song view instead of having so many visible rows (maybe toggle-able?)
+        - BPM, Song metadata, etc.
+    - Highlight columns instead of rows on song view <sup>Unsure if that's even an improvement</sup>
     - `Convert tracker font to 2bpp and move to BG3 layer, use BG2 for UI graphics`
     - `Dynamic variable width font for UI elements`
 - Basic tracker commands
@@ -49,6 +64,7 @@ The control scheme is optimized to the SNES's 12-button D-pad. If you are using 
         - Tempo change
         - Loop data
         - Arpeggio
+    - Delay
     - ~~"Key off" entries~~ <sup>Done</sup>
 - ✅ Edit instruments in tracker <sup>Done</sup>
 - Improve instrument editing
@@ -91,3 +107,4 @@ The control scheme is optimized to the SNES's 12-button D-pad. If you are using 
 - Pre-emphasize samples to counterbalance the SNES DSP's gaussian filter
 - VJ mode?
 - 2-Player controls
+- A simultaneous view of all >=8 chains playing at the same time according to the song view

@@ -12,8 +12,14 @@ GuiTilemapBuffer:
 TilemapBuffer:
 .res 32*32*2
 .res $200 ; TODO: (remove) buffer because our song view currently overflows the tilemap buffer...
-UiTilemapBuffer:
+BackdropTilemapBuffer:
 .res 32*32*2
+
+.segment ClipboardSegment
+
+Clipboard:
+.res $803 	; Max clipboard contents is a completely selected song (+ header) for no reason.
+			; Should be no issue reducing the max select size in song view to save ram space when we need it
 
 .ifdef HIROM
 
@@ -62,12 +68,25 @@ Input_StartPlayback: .res 2
 Input_CustomHandler: .res 2
 Input_NavigateIn: .res 2
 Input_NavigateBack: .res 2
+Input_MoveUp: .res 2
+Input_MoveDown: .res 2
+Input_MoveLeft: .res 2
+Input_MoveRight: .res 2
+Input_StartSelection: .res 2
+Input_EndSelection: .res 2
+Input_CopySelection: .res 2
+Input_CutSelection: .res 2
+Input_Paste: .res 2
+Input_Erase: .res 2
+Input_Clone: .res 2
 OnPlaybackStopped: .res 2
 
 .segment "BSS"
 CurrentScreen: .res 1
 PreviousScreen: .res 1
 ResetStack: .res 2
+SelectingActive: .res 1
+ExpectDoubleTap: .res 1
 
 .segment CompiledPlaybackDataSegment
 CompiledPattern:
@@ -88,13 +107,18 @@ InitEditor:
 .import LoadTextGraphics, LoadPalettes
 .import Instrument_Init, Cursor_Init, Pattern_Init, Chain_Init, Song_Init, Samples_Init
 
-	jsr LoadSong ; TODO: Handle this BEFORE going into the editor
+	; SONG LOAD - TODO: Handle this BEFORE going into the editor
+	jsr LoadSong
+	.import UpdateUnusedPhrasesGlobal
+	jsl UpdateUnusedPhrasesGlobal
+	; SONG LOAD
 	
 	; INIT RAM VALUES - Initiate each editor once. Anything that needs to be reset whenever navigating there should be in LoadView
 jsr ResetSprites
 jsr FinalizeSprites
 LoadBlockToOAM OamBuffer, 544
 
+	stz Clipboard
 	jsl Instrument_Init
 	jsl Samples_Init
 	jsl Cursor_Init
@@ -118,10 +142,10 @@ stx FragmentedRemainingBytes ; TODO: Init routine for playback handler
 
 	jsr LoadPalettes
 	
-	jsl LoadBackgroundUi
+	jsl LoadBackdropUi
 	ldx #Bg3TileMapBase>>1
 	stx Bg3Offset
-	jsl CopyTilemapToUiLayer
+	jsl CopyBackdropTilemap
 
 
 ldx #2
@@ -260,7 +284,7 @@ LoadSong:
 	cpx #@HeaderVerificationCode
 	bne @resetData
 	cmp #@SaveBreakingBuildVersion
-	; TODO: Give user a nice message asking them if they want to reset the data, or give them a change to back it up first
+	; TODO: Give user a nice message asking them if they want to reset the data, or give them a chance to back it up first
 	bne :+
 		plb
 		rts ; Valid song already present, use sram as-is
@@ -356,6 +380,7 @@ LoadSong:
 	sta HEADER+2
 
 	plb
+	
 rts
 
 .macro jumpTable TableReference
@@ -367,60 +392,98 @@ rts
 	jsr (.loword(TableReference), X)
 .endmacro
 
-.export CopyEntireTilemap, CopyTilemapToUiLayer
+.export CopyEntireTilemap, CopyBackdropTilemap
 CopyEntireTilemap:
 	LoadBlockToVRAM TilemapBuffer, Bg2TileMapBase, 32*29*2
 rtl
-CopyTilemapToUiLayer:
-	LoadBlockToOffsetVRAM UiTilemapBuffer, Bg3Offset, 32*29*2
+CopyBackdropTilemap:
+	LoadBlockToOffsetVRAM BackdropTilemapBuffer, Bg3Offset, 32*29*2
 rtl
 
 .segment "CODE6"
 
-LoadBackgroundUi:
-	jsr ClearUiTilemap
+LoadBackdropUi:
 	seta16
+	;lda #($3f*2) ; Blank space - * 2 because it's 2bpp
 	lda #$08df
-	ldx #$0FE+$C0
-	:
-		sta f:UiTilemapBuffer,x
-		inx
-		inx
-		cpx #$116+$C0
-	bne :-
-	ldx #$1FE+$C0
-	:
-		sta f:UiTilemapBuffer,x
-		inx
-		inx
-		cpx #$216+$C0
-	bne :-
-	ldx #$2FE+$C0
-	:
-		sta f:UiTilemapBuffer,x
-		inx
-		inx
-		cpx #$316+$C0
-	bne :-
-	ldx #$3FE+$C0
-	:
-		sta f:UiTilemapBuffer,x
-		inx
-		inx
-		cpx #$416+$C0
-	bne :-
-	seta8
-rtl
-ClearUiTilemap:
-	seta16
-	lda #($3f*2) ; Blank space - * 2 because it's 2bpp
 	ldx #((32*32*2)-2)
 	:
-		sta f:UiTilemapBuffer,x
+		sta f:BackdropTilemapBuffer,x
 		dex
 		dex
 	bpl :-
 	seta8
+rtl
+ShowPatternBackdrop:
+	lda #1
+	sta ShowBg3
+	lda #$04
+	ldx #$0FE+$C0+$24
+	:
+		sta f:BackdropTilemapBuffer+1,x
+		inx
+		inx
+		cpx #$116+$C0+$24
+	bne :-
+	ldx #$1FE+$C0+$24
+	:
+		sta f:BackdropTilemapBuffer+1,x
+		inx
+		inx
+		cpx #$216+$C0+$24
+	bne :-
+	ldx #$2FE+$C0+$24
+	:
+		sta f:BackdropTilemapBuffer+1,x
+		inx
+		inx
+		cpx #$316+$C0+$24
+	bne :-
+	ldx #$3FE+$C0+$24
+	:
+		sta f:BackdropTilemapBuffer+1,x
+		inx
+		inx
+		cpx #$416+$C0+$24
+	bne :-
+rts
+ShowClearBackdrop:
+	lda ShowBg3
+	bne :+
+		; Already cleared, no reason to do more
+		rts
+	:
+	stz ShowBg3
+	;lda #($3f*2) ; Blank space - * 2 because it's 2bpp
+	lda #$08
+	ldx #$0FE+$C0+$24
+	:
+		sta f:BackdropTilemapBuffer+1,x
+		inx
+		inx
+		cpx #$116+$C0+$24
+	bne :-
+	ldx #$1FE+$C0+$24
+	:
+		sta f:BackdropTilemapBuffer+1,x
+		inx
+		inx
+		cpx #$216+$C0+$24
+	bne :-
+	ldx #$2FE+$C0+$24
+	:
+		sta f:BackdropTilemapBuffer+1,x
+		inx
+		inx
+		cpx #$316+$C0+$24
+	bne :-
+	ldx #$3FE+$C0+$24
+	:
+		sta f:BackdropTilemapBuffer+1,x
+		inx
+		inx
+		cpx #$416+$C0+$24
+	bne :-
 rts
 
 ClearTilemap:
@@ -468,9 +531,21 @@ rtl
 
 LoadView:
 	jsr ClearTilemap
-	stz ShowBg3
+	;stz ShowBg3
+	jsr ShowClearBackdrop
+	stz SelectingActive
+	stz ExpectDoubleTap
 	ldx #$1C8
 	stx z:LoadView_TilemapOffset
+	
+	Bind Input_Erase, NoAction
+	Bind Input_StartSelection, NoAction
+	Bind Input_EndSelection, NoAction
+	Bind Input_CopySelection, NoAction
+	Bind Input_CutSelection, NoAction
+	Bind Input_Paste, NoAction
+	Bind Input_Clone, NoAction
+	
 	jumpTable ViewLoaders
 rtl
 ViewLoaders: .import Song_FocusView, Chain_FocusView, Pattern_FocusView, Instrument_FocusView, Samples_FocusView
@@ -478,6 +553,8 @@ ViewLoaders: .import Song_FocusView, Chain_FocusView, Pattern_FocusView, Instrum
 .addr 0, Samples_FocusView
 
 .segment "CODE7"
+
+NoAction: rts
 HandleInput:
 
 	lda ButtonPushed+1
@@ -518,13 +595,16 @@ HandleInput:
 		;RETURNS - no more inputs read this frame
 	:
 
-	lda ButtonPushed
-	bit #<KEY_A
-	beq :+
-		jmp (Input_NavigateIn)
+	lda ButtonStates+1
+	and #>KEY_SELECT
+	ora ButtonPushed+1
+	and #>KEY_SELECT|>KEY_Y
+	cmp #>KEY_SELECT|>KEY_Y
+	bne :+
+		jmp (Input_Clone)
 		;RETURNS - no more inputs read this frame
 	:
-	
+
 	lda ButtonStates+1
 	and #>KEY_SELECT
 	ora ButtonPushed+1
@@ -535,15 +615,82 @@ HandleInput:
 		;RETURNS - no more inputs read this frame
 	:
 	
+	;lda ButtonStates
+	;bit #<KEY_R
+	;beq :+
+	;	lda ButtonPushed+1
+	;	bit #>KEY_Y
+	;	beq :+
+	;		jmp (Input_Paste)
+	;:
+	lda ButtonPushed
+	bit #<KEY_L
+	beq :+
+		lda #$ff
+		sta SelectingActive
+		jmp (Input_StartSelection)
+		;RETURNS - no more inputs read this frame
+	:
+	
+	lda ButtonStates
+	bit #<KEY_L
+	bne :+
+		lda SelectingActive
+		bpl @continue
+			; When L isn't held and there's a selection, forget selection
+			jmp EndSelection
+	:
+		; L key held
+		lda ButtonPushed+1
+		bit #>KEY_B
+		beq :+
+			jsr CopySelection
+			jmp EndSelection
+		:
+		bit #>KEY_Y
+		beq :+
+			stz ExpectDoubleTap
+			jmp (Input_Paste)
+		:
+		
+		lda ButtonPushed
+		bit #<KEY_X
+		beq :+
+			jsr CutSelection
+			jmp EndSelection
+		:
+
+		; TOOD: While selecting with L button, only allow cursor movements or combination inputs
+		; jmp HandleCursorInput	
+	@continue:
+
 	lda ButtonPushed+1
 	bit #>KEY_B
 	beq :+
 		jmp (Input_NavigateBack)
 		;RETURNS - no more inputs read this frame
 	:
+	lda ButtonPushed
+	bit #<KEY_A
+	beq :+
+		jmp (Input_NavigateIn)
+		;RETURNS - no more inputs read this frame
+	:
+	bit #<KEY_X ; Key X removes current chain
+	beq :+
+		jmp (Input_Erase)
+		;RETURNS - no more inputs read this frame
+	:
+
+HandleCursorInput:
 
 jmp (Input_CustomHandler)
 
+CutSelection: jmp (Input_CutSelection)
+CopySelection: jmp (Input_CopySelection)
+EndSelection:
+	stz SelectingActive
+jmp (Input_EndSelection)
 
 ; TODO: Dedicated GUI handler?
 

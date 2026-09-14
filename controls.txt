@@ -1,0 +1,30 @@
+Direction: Move cursor
+Y + Direction: Change selected value/note
+Hold Y: Play selected note
+X: Clear selected value
+A: Navigate to edit selected chain or phrase
+B: Go back
+
+Start: Play current chain or phrase
+Select+Start: Play entire song from start
+
+Hold L + Direction: Mark multiple values
+L + B: Copy marked values
+L + X: Cut marked values (copy and clear)
+L + Y: Paste copied values at cursor position
+Select + Y: Clone current chain or phrase into next empty index
+
+R: See available samples
+
+
+Effect commands:
+Some may not work, some may act weird
+Commands currently only work on playback - not when playing single notes
+
+Tp: Change song tempo (lower value = faster)
+V(down), V(up), V*: Gain down/up/set (don't work)
+P(down), P(down): Pitch down/up
+Arp: Arpeggio (number value works same as ImpulseTracker)
+<*>: Pan (E0-FF are negative values)
+CV: Change song volume
+E)): Echo (doesn't work)

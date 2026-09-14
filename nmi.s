@@ -45,14 +45,16 @@ stz NMITEST
 
 
 
-.import CopyEntireTilemap, CopyTilemapToUiLayer, CopyGuiTilemap, UpdateGui
+.import CopyEntireTilemap, CopyBackdropTilemap, CopyGuiTilemap, UpdateGui
 jsl CopyEntireTilemap ; TODO: just queue updated rows?
 lda UpdateGui
 beq :+
+	; Updates the entire GUI view (only when navigating)
 	jsl CopyGuiTilemap
 	bra :++
 :
-	jsl CopyTilemapToUiLayer
+	; Updates BG3 (the colored background tiles) which indicate every 4th, playback status, and selected blocks
+	jsl CopyBackdropTilemap
 :
 
 	jsr Vfx_Update_Vblank
