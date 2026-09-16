@@ -1,6 +1,11 @@
 .include "global.inc"
 .include "snes.inc"
 
+; SPRITE MAP:
+; 0,1,2: Cursor
+; 4-19: Row numbers (8x2 sprites)
+; 20-37: Highlighter sprites (9x2 sprites)
+
 .segment "BSS"
 .export RefreshOam
 RefreshOam: .res 1

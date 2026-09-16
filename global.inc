@@ -9,7 +9,7 @@ MAX_INSTRUMENTS = 53
 .define CompiledPlaybackDataSegment "BSS7F"
 
 ;Sort this out
-.global LoadGuiMap
+.global LoadGuiMap, LoadLineSprites
 
 
 ; Memory addresses

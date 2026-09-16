@@ -3,6 +3,8 @@
 .smart
 
 .import Vfx_Update, Vfx_ResetOnNavigation, Vfx_Init, Playback_Update, StopPlayback
+.export LineNumberSpriteStartIndex
+LineNumberSpriteStartIndex = 4
 
 
 .segment TilemapBufferSegment
@@ -177,7 +179,7 @@ stx ScrollY ; TODO: Dedicated GUI handler?
 
 	; (alternate between $f000 and $f800
 
-	lda #(SpriteChrBase >> 14) | OBSIZE_16_32
+	lda #(SpriteChrBase >> 14) | OBSIZE_8_16
 	sta OBSEL
 
 
@@ -546,6 +548,7 @@ LoadView:
 	Bind Input_Paste, NoAction
 	Bind Input_Clone, NoAction
 	
+	jsl LoadLineSprites
 	jumpTable ViewLoaders
 rtl
 ViewLoaders: .import Song_FocusView, Chain_FocusView, Pattern_FocusView, Instrument_FocusView, Samples_FocusView
@@ -731,6 +734,68 @@ SongGuiMap = 4
 ChainGuiMap = 4 + 32*30
 InstrumentGuiMap = 4 + 32*30*2
 
+LoadLineSprites:
+	phy
+	lda #0
+	xba
+	lda CurrentScreen
+	asl
+	tax
+	cpx #4
+	bcc :+
+		ldx #4
+	:
+	ldy LineNumberSprites, X
+	ldx #LineNumberSpriteStartIndex*4
+	:
+		lda LineNumbers,Y
+		sta OamBuffer,X
+		inx
+		iny
+		cpx #(LineNumberSpriteStartIndex*4) + (16*4)
+	bne :-
+	ply
+rtl
+
+LineNumberSprites:
+.addr SongLineNumbers-LineNumbers, ChainAndPhraseLineNumbers-LineNumbers, NoLineNumbers-LineNumbers
+LineNumbers:
+; TODO: This seems like a massive waste of space, considering all the repetition
+ChainAndPhraseLineNumbers:
+.byte 12,53,$20,%00110000|2
+.byte 17,53,$20,%00110000|2
+.byte 12,85,$20,%00110000|2
+.byte 17,85,$24,%00110000|2
+.byte 12,117,$20,%00110000|2
+.byte 17,117,$28,%00110000|2
+.byte 12,149,$20,%00110000|2
+.byte 17,149,$2C,%00110000|2
+
+.byte 124,53,$20,%00110000|2
+.byte 129,53,$20,%00110000|2
+.byte 124,85,$20,%00110000|2
+.byte 129,85,$24,%00110000|2
+.byte 124,117,$20,%00110000|2
+.byte 129,117,$28,%00110000|2
+.byte 124,149,$20,%00110000|2
+.byte 129,149,$2C,%00110000|2
+
+SongLineNumbers:
+.byte 12,53,$20,%00110000|2
+.byte 17,53,$20,%00110000|2
+.byte 12,85,$20,%00110000|2
+.byte 17,85,$24,%00110000|2
+.byte 12,117,$20,%00110000|2
+.byte 17,117,$28,%00110000|2
+.byte 12,149,$20,%00110000|2
+.byte 17,149,$2C,%00110000|2
+.byte 12,181,$21,%00110000|2
+.byte 17,181,$20,%00110000|2
+
+NoLineNumbers:
+.repeat 16
+.byte 224,224,0,224
+.endrepeat
 
 .segment "RODATA"
 GuiChr:

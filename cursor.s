@@ -46,7 +46,7 @@ UpdateCursorSpriteAndHighlight:
 	seta8
 	lda #$20
 	ldx PrevCursorPositionOffset,Y
-	jsr SetPaletteValues
+	jsr SetPaletteValues ; Reset highlight from previous position
 
 	lda CursorY
 	seta16
@@ -61,7 +61,7 @@ UpdateCursorSpriteAndHighlight:
 	tax
 	seta8
 	lda #(1<<2)|$20
-	jsr SetPaletteValues
+	jsr SetPaletteValues ; Set highlight for current position
 	
 	
 	.import RefreshOam
@@ -75,7 +75,10 @@ UpdateCursorSpriteAndHighlight:
 	sec
 	sbc #5
 	sta OamBuffer+1
-	sta OamBuffer+1+4
+	sta OamBuffer+1+4 ; Y coords. Always the same
+	clc
+	adc #8
+	sta OamBuffer+1+8 ; If 8 pixel end bracket, use a third 8x8 sprite to draw that below
 
 	lda CursorOffset
 	lsr
@@ -87,26 +90,33 @@ UpdateCursorSpriteAndHighlight:
 	sec
 	sbc #3
 	sta OamBuffer+0
-	tax
+	clc
+	adc #16
+	sta OamBuffer+0+4
+	sta OamBuffer+0+8
+
 	lda CursorSize
-	beq :+
-		; Wide cursor. Add 16 pixels
-		txa
-		clc
-		adc #16
+	cmp #1
+	beq :++
+		lda #$02 ; Sprite tile index
+		sta OamBuffer+2
+		lda CursorSize
+		beq :+
+			; Largest cursor
+			lda #$04 ; Sprite tile index
+			sta OamBuffer+2+4
+			bra :+++
+		:
+		lda #$05 ; Sprite tile index
+		sta OamBuffer+2+4
+		lda #$15 ; Sprite tile index
+		sta OamBuffer+2+8
 		bra :++
 	:
-		; Small cursor. Add 8 pixels
-		txa
-		clc
-		adc #8
+		; Smalles cursor
+		lda #10 ; Sprite tile index
+		sta OamBuffer+2
 	:
-	sta OamBuffer+0+4
-
-	lda #2 ; Sprite tile index
-	sta OamBuffer+2
-	lda #4 ; Sprite tile index
-	sta OamBuffer+2+4
 	ldy #%00000000
 	lda EditMode
 	beq :+
@@ -115,9 +125,29 @@ UpdateCursorSpriteAndHighlight:
 	tya
 	sta OamBuffer+3
 	sta OamBuffer+3+4
-	lda OamBuffer+$200
-	and #%11110000
+	sta OamBuffer+3+8
+
+	lda CursorSize
+	beq :+
+		lda #%00001010 ; Large sprite 1 and 2
+		bra :++
+	:
+		lda #%00000010 ; Large sprite 1, small sprite 2 and 3
+	:
 	sta OamBuffer+$200
+	
+	lda CursorSize
+	beq :++
+		cmp #1
+		bne :+
+			; Smallest. Only one sprite
+			lda #224
+			sta OamBuffer+1+4
+		:
+			; Biggest. Two sprites
+			lda #224
+			sta OamBuffer+1+8
+	:
 	
 	lda #1
 	sta RefreshOam

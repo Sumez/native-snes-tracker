@@ -146,7 +146,7 @@
       <Output>gfx/cursor.chr</Output>
       <Output>gfx/cursor.pal</Output>
       <Output>gfx/cursor.map</Output>
-      <LastProcessed>2026-09-11T15:50:18.8599116+02:00</LastProcessed>
+      <LastProcessed>2026-09-15T09:54:33.9410608+02:00</LastProcessed>
       <Property>
         <Key>DiscardRedundant</Key>
         <Value>0</Value>

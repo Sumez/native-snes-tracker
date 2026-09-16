@@ -61,6 +61,7 @@ FocusView:
 	ldy #.loword(Name)
 	jsl WriteTilemapHeader
 	jsl ShowCursor_long
+	jsl SongScrolled_long
 rts
 
 .export Song_LoadView = LoadView
@@ -703,7 +704,7 @@ MoveCursorUp:
 		
 			; Scrolled above lowest visible row
 			dec SongScroll
-			jsl WriteTilemapBuffer
+			jsr SongScrolled
 	:
 jmp ShowCursor
 MoveCursorDown:
@@ -719,7 +720,7 @@ MoveCursorDown:
 		
 			; Scrolled below lowest visible row
 			inc SongScroll
-			jsl WriteTilemapBuffer
+			jsr SongScrolled
 	:
 jmp ShowCursor
 MoveCursorLeft:
@@ -735,6 +736,57 @@ MoveCursorRight:
 		inc CursorPosition+1
 	:
 jmp ShowCursor
+
+LineNumberYCoords:
+@ycoord .set 53
+.repeat VisibleRows
+	.byte @ycoord
+	@ycoord .set @ycoord+8
+.endrepeat
+.import LineNumberSpriteStartIndex
+SongScrolled_long: jsr SongScrolled
+rtl
+SongScrolled: ; When scrolled, update the line number sprites
+	ldx #LineNumberSpriteStartIndex*4
+	ldy	#0
+	lda #0
+	xba
+	lda SongScroll
+	@loop:
+		bit #$03
+		bne :+
+			sta 0
+			lsr
+			lsr
+			lsr
+			lsr
+			ora #$20
+			sta OamBuffer+2+0,X
+			lda 0
+			and #$0f
+			ora #$20
+			sta OamBuffer+2+4,X
+			lda LineNumberYCoords,Y
+			sta OamBuffer+1+0,X
+			sta OamBuffer+1+4,X
+			txa
+			clc
+			adc #8
+			tax
+			lda 0
+		:
+		inc a
+		iny
+		cpy #VisibleRows
+	bne @loop
+	cpx #(LineNumberSpriteStartIndex*4)+(8*4)
+	bne :+
+		lda #224
+		sta OamBuffer+1+0,X
+		sta OamBuffer+1+4,X
+	:
+	jsl WriteTilemapBuffer
+rts
 
 ShowCursor_long: jsr ShowCursor
 rtl

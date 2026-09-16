@@ -1,6 +1,8 @@
 .include "global.inc"
 .include "src/snes.inc"
 
+HighlightSpriteStartIndex = 20
+
 .segment "BSS"
 BopTimer: .res 1
 MosaicTimer: .res 1
@@ -27,7 +29,7 @@ Init:
 
 	lda #0
 	xba
-	ldx #$08 ; index of first row-highlight sprite
+	ldx #HighlightSpriteStartIndex*4 ; index of first row-highlight sprite
 	:		
 		@palette = 1
 		@priority = 0
@@ -38,14 +40,22 @@ Init:
 		clc
 		adc #8
 		tax
-		cpx #$50
+		cpx #((HighlightSpriteStartIndex*4) + (9*8))
 	bne :-
-		
-	stz OamBuffer+$200
-	stz OamBuffer+$201
-	stz OamBuffer+$202
-	stz OamBuffer+$203
-	stz OamBuffer+$204
+	
+	lda #%00100010
+	sta OamBuffer+$205
+	sta OamBuffer+$206
+	sta OamBuffer+$207
+	sta OamBuffer+$208
+	sta OamBuffer+$209
+	
+	; Line sprites
+	lda #%00000000
+	sta OamBuffer+$201
+	sta OamBuffer+$202
+	sta OamBuffer+$203
+	sta OamBuffer+$204
 
 Reset:
 	stz MosaicTimer
@@ -169,7 +179,7 @@ rts
 
 UpdateHighlights:
 
-	ldx #8 ; OamOffset
+	ldx #HighlightSpriteStartIndex*4 ; OamOffset
 	lda #30
 	sta z:HighlightX
 	lda CurrentScreen
@@ -233,7 +243,7 @@ DrawHighlightSprite:
 	lda HighlightX
 	sta OamBuffer+0,X
 	clc
-	adc #3
+	adc #11
 	sta OamBuffer+0+4,X
 rts
 

@@ -26,8 +26,7 @@ The control scheme is optimized to the SNES's 12-button D-pad. If you are using 
 - Improved navigation
     - ~~Show adjacent views (chain preview from song view - chain and phrase are always visible at the same time)~~ <sup>Done</sup>
     - ~~Scroll up/down on song view~~ <sup>Done</sup>
-        - Sprite based(?) discrete index numbers to the left of every 4th row (00..04..08..0C..10..14)
-    - "Channel bar" in the top, facilitates navigating between channels using L/R buttons (probably)
+    - "Channel bar" in the top, facilitates navigating between channels using some button combination
     - ~~Navigate up down between sequential chains and phrases based on where in the song you are~~ <sup>Done</sup>
     - ~~Select multiple and copy/paste~~ <sup>Done</sup>
         - Bug: Pasting into a phrase while playback is active will not update the playing phrase, only the note where the cursor was
@@ -46,13 +45,14 @@ The control scheme is optimized to the SNES's 12-button D-pad. If you are using 
     - Custom FIR filters (sound modulation)
 - Rudimentary GUI
     - More pleasant temporary graphics <sup>In progress</sup>
-    - Save up sprite slots by having 32x32 sprites (a row playing in song view on all channels will now use 16 sprites plus potentially 2 from the cursor. Could easily be just 9)
+    - ~~Save up sprite slots by having 32x32 sprites (a row playing in song view on all channels will now use 16 sprites plus potentially 2 from the cursor. Could easily be just 9)~~ <sup>Improved</sup>
+        - ~~Did the opposite and wasted sprite slots by making mid-size cursor using up 3 sprites instead of 2. I changed sprite sizes to 8/16 though, so I would use fewer 8px slices and prevent overflow blanking out sprites~~
     - Visible UI hints for easier navigation
-    - Row and column labels <sup>In progress</sup>
-        - Use sprites to display row indexes on song view?
+    - ~~Row and column labels~~ <sup>Done/sup>
+        - ~~Use sprites to display row indexes on song view?~~
     - Show more useful information on song view instead of having so many visible rows (maybe toggle-able?)
         - BPM, Song metadata, etc.
-    - Highlight columns instead of rows on song view <sup>Unsure if that's even an improvement</sup>
+    - ~~Highlight columns instead of rows on song view <sup>Decided against this. It looks nice as it is~~</sup>
     - `Convert tracker font to 2bpp and move to BG3 layer, use BG2 for UI graphics`
     - `Dynamic variable width font for UI elements`
 - Basic tracker commands

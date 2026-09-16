@@ -984,7 +984,7 @@ jmp UpdateCursorSpriteAndHighlight
 CursorPositions:
 .byte 0,4,7,8
 CursorTypes:
-.byte 1,0,1,0
+.byte 2,0,1,0
 CursorWidths:
 .byte 3,2,1,2
 
