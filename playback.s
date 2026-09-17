@@ -46,6 +46,7 @@ PatternToFind: .res 2
 BarCounter = PatternToFind ; Reuse this variable since the two routines always run in sequence and will never conflict
 CurrentCompileIndex: .res 2
 CurrentPatternOffset: .res 2
+CurrentTransposeIndex: .res 2
 EmptyPatternOffset: .res 2
 SingleNotePatternOffset: .res 2
 SingleNotePatternOffsetInSpcSource: .res 2
@@ -59,6 +60,7 @@ InstrumentDataOffset: .res 2
 SongRowOfChannel: .res $10
 ChainOffsetOfChannel: .res $10 ; row that will be read when NEXT phrase starts
 PhraseOfChannel: .res $10
+TransposeOfChannel: .res $10
 Playback_CurrentChainOffsetOfChannel: .res $10 ; Caches the last actually read row
 PatternOffsetTablePointer: .res 2
 
@@ -511,7 +513,14 @@ CompileTestPattern:
 	pha
 	plb
 
-	lda #16+2+1+1+2 ; 8 order references (one row of 8 channels) + $ffff at the end + one row looping forever + $00 $at the end + $ffff for empty macro dir
+; 16: 8 order references (one row of 8 channels)
+; 2: $ffff at the end of order references
+; 1: one row looping forever
+; 1: $00 $at the end
+; 8: 8 transpose values (one row of 8 channels)
+; 1: $80 at the end or transpose values
+; 2: $ffff for empty macro dir
+	lda #(16+2)+(1+1)+(8+1)+2
 	jsr CopySongHeaderAndCalculateOffsets
 	.a16
 	jsr AddEmptyPattern
@@ -533,6 +542,7 @@ CompileTestPattern:
 	bne :-
 	; Y = The end of the second row of pattern reference rows
 	
+	; TODO: Copy all this from precompiled data, maybe even using DMA?
 	lda #$ffff ; End of pattern refs
 	sta CompiledPattern,Y
 	iny
@@ -544,13 +554,30 @@ CompileTestPattern:
 	sta CompiledPattern,Y
 	iny
 	
+	lda #$0000 ; Two patterns with transpose of 0
+	sta CompiledPattern,Y
+	iny
+	iny
+	sta CompiledPattern,Y
+	iny
+	iny
+	sta CompiledPattern,Y
+	iny
+	iny
+	sta CompiledPattern,Y
+	iny
+	iny
+	lda #$80 ; End of transpose values
+	sta CompiledPattern,Y
+	iny
+	
 	jsr CopyMacrosAndInstruments	
 	
 	seta8
 	plb
 rtl
 
-CompilePhraseToBuffer:	; !!! Needs to preserve [X] into CompileSinglePattern
+CompilePhraseToBuffer:	; !!! Needs to preserve [X] into CompileSinglePhrase
 	
 	phb
 	lda #^CompiledPattern
@@ -587,6 +614,9 @@ CompileNextRowInSong:
 		stz z:PatternOffsetTablePointer ; Toggle between 0, and the offset to the alternating table, on alternating rows
 		lda z:PatternIndexOffset
 		sta z:CurrentCompileIndex
+			clc
+			adc #16+16+2+3 ; size of two rows of pattern indexes, the $ffff end and the pattern size table
+		sta z:CurrentTransposeIndex
 		lda z:FirstRowPatternOffset ; Toggle between first pattern offset, and one the exact size of 8 patterns later, on alternating rows
 		sta z:CurrentPatternOffset
 		jsr CompileSongRowToBuffer
@@ -601,6 +631,9 @@ CompileNextRowInSong:
 			clc
 			adc #16
 		sta z:CurrentCompileIndex
+			clc
+			adc #16+2+3+8 ; size of one rows of pattern indexes, the $ffff end, the pattern size table, and one row of transpose values
+		sta z:CurrentTransposeIndex
 		lda z:SecondRowPatternOffset
 		sta z:CurrentPatternOffset
 		jsr CompileSongRowToBuffer
@@ -609,6 +642,9 @@ CompileNextRowInSong:
 	plb
 rtl
 
+; Input A: Projected size of the pattern index
+; Output X: Start of pattern index
+; Output Y: Start of pattern data
 CopySongHeaderAndCalculateOffsets:
 .import GetFirstUnusedInstrumentOffset
 @patternStart = 0
@@ -638,7 +674,7 @@ CopySongHeaderAndCalculateOffsets:
 	; TODO: Actually generate 18 byte header based on song settings
 	ldx #0
 	:
-		lda f:TestPatternSource,X
+		lda f:TestPatternSource,X ; "TestPatternSource" is a temporary placeholder until we get a real header
 		sta CompiledPattern,X
 		inx
 		cpx #18 ; Header length
@@ -747,15 +783,25 @@ CopyCurrentSongToSpcBuffer:
 	sta f:PatternOffsetReferences ; $FF indicates the first empty entry, just move the $FF every time an entry is added to prevent looping through the whole thing
 	sta f:PatternOffsetReferencesAlternating ; $FF indicates the first empty entry, just move the $FF every time an entry is added to prevent looping through the whole thing
 
-	lda #32+2+2+1+2 ; 16 order references (two rows of 8 channels) + $ffff at the end + two rows looping forever + $00 $at the end + $ffff for empty macro dir
+	; 32: 16 order references (two rows of 8 channels)
+	; 2: $ffff at the end of order references
+	; 2: 2 pattern sizes (two rows)
+	; 1: $00 at the end
+; 16: 16 transpose values (two rows of 8 channels)
+; 1: $80 at the end or transpose values
+	; 2: $ffff for empty macro dir
+	lda #(32+2)+(2+1)+(16+1)+2
 	jsr CopySongHeaderAndCalculateOffsets
 	.a16
 	; First pattern is always empty, allows us to easily silence channels
 	jsr AddEmptyPattern
 	
-	; PATTERN REFERENCES
+	; STORE PATTERN REFERENCES FOR FUTURE DATA ALTERATIONS
 	lda z:PatternIndexOffset
 	sta z:CurrentCompileIndex
+		clc
+		adc #16+16+2+3 ; size of two rows of pattern indexes, the $ffff end, and the pattern size table
+	sta z:CurrentTransposeIndex
 	lda z:FirstRowPatternOffset ; Toggle between first pattern offset, and one the exact size of 8 patterns later, on alternating rows
 	sta z:CurrentPatternOffset
 	clc
@@ -763,8 +809,10 @@ CopyCurrentSongToSpcBuffer:
 	sta z:SecondRowPatternOffset
 	adc #(4*16+1)*8
 	sta z:SecondRowPatternEnd
+	
 	stz z:PatternOffsetTablePointer ; Toggle between 0, and the offset to the alternating table, on alternating rows
-	jsr CompileSongRowToBuffer
+
+	jsr CompileSongRowToBuffer ; Compile the current row. Will be called again right before the next row plays
 	; Y = The end of the first row of pattern reference rows
 	
 	ldy z:CurrentCompileIndex
@@ -787,6 +835,20 @@ CopyCurrentSongToSpcBuffer:
 	sta CompiledPattern,Y
 	iny
 	lda #0 ; End of pattern lengths
+	seta8 ; Avoid overwriting a transpose value we've already saved
+	sta CompiledPattern,Y
+	seta16
+	iny
+	
+	lda #$0000 ; Two patterns with transpose of 0
+	ldx #8 ; X isn't read any more at this point because we're done adding pattern data
+	:
+		;sta CompiledPattern,Y ; Write 8 times (16 patterns = 2 rows of 8)
+		iny
+		iny
+		dex
+	bne :-
+	lda #$80 ; End of transpose values
 	sta CompiledPattern,Y
 	iny
 	
@@ -870,6 +932,7 @@ MoveChannelToNextRowOfSong:
 	rts
 
 CompileSongRowToBuffer:
+@transposeTemp = 0
 .a16
 	
 	ldy #0 ; Channel index (x2)
@@ -898,6 +961,9 @@ CompileSongRowToBuffer:
 		:
 		
 		; Not skipping channel, load next entry in chain
+		lda f:CHAINS+1,X
+		sta @transposeTemp ; Store transpose value before we lose X index
+		
 		lda f:CHAINS,X
 		and #$ff
 		cmp #$ff
@@ -908,6 +974,8 @@ CompileSongRowToBuffer:
 		:
 		tax
 		stx z:PhraseOfChannel,Y
+		ldx @transposeTemp
+		stx z:TransposeOfChannel,Y
 		ldx z:ChainOffsetOfChannel,Y
 		stx z:Playback_CurrentChainOffsetOfChannel,Y
 		inx
@@ -936,6 +1004,30 @@ CompileSongRowToBuffer:
 	jsr @AddPhraseToIndex
 	lda z:PhraseOfChannel+14
 	jsr @AddPhraseToIndex
+
+	ldy z:CurrentTransposeIndex
+	seta8
+	lda z:TransposeOfChannel+0
+	sta CompiledPattern+0,y
+	lda z:TransposeOfChannel+2
+	sta CompiledPattern+1,y
+	lda z:TransposeOfChannel+4
+	sta CompiledPattern+2,y
+	lda z:TransposeOfChannel+6
+	sta CompiledPattern+3,y
+	lda z:TransposeOfChannel+8
+	sta CompiledPattern+4,y
+	lda z:TransposeOfChannel+10
+	sta CompiledPattern+5,y
+	lda z:TransposeOfChannel+12
+	sta CompiledPattern+6,y
+	lda z:TransposeOfChannel+14
+	sta CompiledPattern+7,y
+	seta16
+	tya
+	clc
+	adc #8
+	sta z:CurrentTransposeIndex
 		
 rts
 
@@ -950,11 +1042,11 @@ rts
 	:
 		jsr @EnsurePatternOffset
 	:
-	ldy CurrentCompileIndex
+	ldy z:CurrentCompileIndex
 	sta CompiledPattern,y
 	iny
 	iny
-	sty CurrentCompileIndex
+	sty z:CurrentCompileIndex
 rts
 
 @EnsurePatternOffset:
@@ -1093,6 +1185,9 @@ AddSinglePhrasePattern:
 	sta CompiledPattern+18,Y ; Remember, when using the pattern offset, add 18 to account for header
 	tya
 	clc
+; Worst case scenario for a pattern size.
+; Since we need to be able to replace pattern data on the fly during playback we have to have a
+; constant size
 	adc #4*16+1
 	tay
 	sty z:CurrentPatternOffset; Nothing more written after this point, but store offset to calculate size of SPC data transferred

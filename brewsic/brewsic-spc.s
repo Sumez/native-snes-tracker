@@ -12,6 +12,7 @@ ChClearCounter: .res Channels
 ChRowCounter: .res Channels
 CurrentChannelRegister: .res 1
 PatternLengthTable: .res 2
+TransposeTable: .res 2
 MacroIndex: .res 2
 InstrumentTable: .res 2
 PatternRowCounter: .res 1
@@ -50,6 +51,7 @@ OneTwo: .res 1
 ChPatternPosition: .res Channels
 CurrentOrderIndex: .res 1
 ChPatternPointers: .res Channels * 2
+ChTranspose: .res Channels
 NoteStates: .res 1
 ChLastPitchAdjust: .res Channels ; TODO: Reset these?
 ChLastVolumeAdjust: .res Channels
@@ -538,12 +540,21 @@ LoadTrack:
 	bne :-
 	
 	movw ya, PatternLengthTable
-	movw MacroIndex, ya
+	movw TransposeTable, ya
 	mov y, #0
 	:	; Find end of Pattern length table
+		mov a, [TransposeTable]+y
+		incw TransposeTable
+		cmp a, #$00
+	bne :-
+	
+	movw ya, TransposeTable
+	movw MacroIndex, ya
+	mov y, #0
+	:	; Find end of Transpose table
 		mov a, [MacroIndex]+y
 		incw MacroIndex
-		cmp a, #$00
+		cmp a, #$80
 	bne :-
 
 	movw ya, MacroIndex
@@ -584,7 +595,7 @@ ResetPattern:
 			jmp !StopTrack
 		:
 		mov !CurrentOrderIndex, a
-		jmp !ResetPattern
+		jmp !ResetPattern ; Try again with new index
 	:
 	mov PatternRowCounter, a
 	
@@ -595,16 +606,32 @@ ResetPattern:
 
 	mov x, #15
 	mov y, #15
-	@channelLoop: ; Set pattern address for each channel
+	@channelLoop1: ; Set pattern address for each channel
 		mov a, [Temp+0]+y
 		mov !ChPatternPointers+x, a
 		dec y
 		dec x
-	bpl @channelLoop
+	bpl @channelLoop1
 	
+.ifdef TESTPATTERN
+	mov y, #TESTPATTERN
+.else
+	mov y, !CurrentOrderIndex
+.endif
+	mov a, #8
+	mul ya
+	addw ya, TransposeTable
+	movw Temp+0, ya
 
+	mov y, #7
 	mov x, #7
-	@channelLoop2: ; Init all channels from data that shouldn't carry over between patterns
+	@channelLoop2:
+		; Read transpose value for each channel pattern
+		mov a, [Temp+0]+y
+		mov !ChTranspose+x, a
+		dec y
+	
+		; Init all channels from data that shouldn't carry over between patterns
 		mov a, #0
 		mov !ChPatternPosition+x, a
 		mov ChClearCounter+x, a
@@ -1161,6 +1188,8 @@ ReadNote:
 	:
 
 	mov a, !ChLastNote+x
+	clrc
+	adc a, !ChTranspose+x
 	
 	mov	y, #64 ; Fine frequency slide works on a step of 1/64 of a semitone, so multiply by 64 to be able to adjust gradually
 	mul	ya

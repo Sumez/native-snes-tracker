@@ -435,4 +435,9 @@
     <RelativePath>gfx/gui.inc</RelativePath>
     <Mode>Ignore</Mode>
   </File>
+  <File>
+    <Id>39</Id>
+    <RelativePath>storage.s</RelativePath>
+    <Mode>IncludeInAssembly</Mode>
+  </File>
 </BrewmasterProject>

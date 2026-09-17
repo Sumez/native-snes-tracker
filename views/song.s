@@ -743,7 +743,7 @@ LineNumberYCoords:
 	.byte @ycoord
 	@ycoord .set @ycoord+8
 .endrepeat
-.import LineNumberSpriteStartIndex
+.importzp LineNumberSpriteStartIndex
 SongScrolled_long: jsr SongScrolled
 rtl
 SongScrolled: ; When scrolled, update the line number sprites

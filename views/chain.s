@@ -215,30 +215,29 @@ WriteTilemapBuffer:
 		
 		lda PhraseIndexes,Y
 		cmp #$ff
-		beq :+
+		beq @emptyRow
 			; Write the number
 			PrintHexNumber TilemapBuffer
-			bra :++
-		:
-			; Empty cell	
-			lda #$1d
-			sta f:TilemapBuffer,x
-			lda #$1f
-			sta f:TilemapBuffer+2,x
-		:
 		
-		lda TransposeValues,Y
-		beq :+
-			; TODO: Write number with +/- notation
-			PrintHexNumber TilemapBuffer+6
-			bra :++
-		:
-			; Empty cell	
-			lda #$3F
-			sta f:TilemapBuffer+6,x
-			sta f:TilemapBuffer+8,x
-		:
-		
+			lda TransposeValues,Y
+			beq @emptyTranspose
+				; TODO: Write number with +/- notation
+				PrintHexNumber TilemapBuffer+6
+				bra :+
+				
+			@emptyRow:
+				; Empty row
+				lda #$1d
+				sta f:TilemapBuffer,x
+				lda #$1f
+				sta f:TilemapBuffer+2,x
+			@emptyTranspose:
+				; Empty cell
+				lda #$1d
+				sta f:TilemapBuffer+6,x
+				lda #$1f
+				sta f:TilemapBuffer+8,x
+		:		
 
 		seta16
 		txa
@@ -380,18 +379,23 @@ Erase:
 	ldx CursorRow
 	lda PhraseIndexes,x
 	cmp #$ff
-	beq :+ ; Don't do anything if cell is already empty
-		sta LastEditedPhrase
+	bne :+ ; Don't do anything if cell is already empty
+		rts
+	:
+	sta LastEditedPhrase
+	stz LastEditedTranspose
+	lda CursorColumn
+	bne :+ ; Branch if only erasing transpose value
+		; Erase both phrase index and transpose value
 		lda TransposeValues,x
 		sta LastEditedTranspose
 		lda #$ff
 		sta PhraseIndexes,x
-		stz TransposeValues,x
-		stz EditMode
-		jsr PhraseIndexWasChanged
-		jmp ShowCursor
 	:
-rts
+	stz TransposeValues,x
+	stz EditMode
+	jsr PhraseIndexWasChanged
+jmp ShowCursor
 
 Clone:
 	ldx CursorRow
@@ -555,6 +559,11 @@ HandleInput:
 		rts ; No navigation pushed
 	:
 	stz ExpectDoubleTap ; If any value edited, reset doubletap wait
+	
+	ldx CursorColumn
+	bne @EditModeTransposeCol
+
+@EditModePhraseCol:
 
 	bit #>KEY_DOWN
 	beq :+
@@ -575,6 +584,29 @@ HandleInput:
 	beq :+
 		lda #1
 		jmp IncreaseCurrentPhrase
+	:
+rts
+@EditModeTransposeCol:
+
+	bit #>KEY_DOWN
+	beq :+
+		lda #(256-12)
+		jmp DecreaseCurrentTranspose
+	:
+	bit #>KEY_UP
+	beq :+
+		lda #12
+		jmp IncreaseCurrentTranspose
+	:
+	bit #>KEY_LEFT
+	beq :+
+		lda #(256-1)
+		jmp DecreaseCurrentTranspose
+	:
+	bit #>KEY_RIGHT
+	beq :+
+		lda #1
+		jmp IncreaseCurrentTranspose
 	:
 rts
 
@@ -614,7 +646,6 @@ DecreaseCurrentPhrase:
 		lda #0
 	:
 	bra storeNewPhraseIndex
-rts
 IncreaseCurrentPhrase:
 	ldx CursorRow
 	clc
@@ -631,6 +662,32 @@ IncreaseCurrentPhrase:
 	sta LastEditedPhrase
 	lda TransposeValues,x
 	sta LastEditedTranspose
+	jsr PhraseIndexWasChanged
+rts
+DecreaseCurrentTranspose:
+	ldx CursorRow
+	clc
+	adc TransposeValues,x
+	bvc:+
+		lda #$81 ; Overflow means it changed from negative to positive
+	:
+	cmp #$80
+	bne :+
+		inc a
+	:
+	bra storeNewTranspose
+IncreaseCurrentTranspose:
+	ldx CursorRow
+	clc
+	adc TransposeValues,x
+	bvc:+
+		lda #$7F ; Overflow means it changed from positive to negative
+	:
+	storeNewTranspose:
+	sta TransposeValues,x
+	sta LastEditedTranspose
+	lda PhraseIndexes,x
+	sta LastEditedPhrase
 	jsr PhraseIndexWasChanged
 rts
 

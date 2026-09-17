@@ -3,7 +3,7 @@
 .smart
 
 .import Vfx_Update, Vfx_ResetOnNavigation, Vfx_Init, Playback_Update, StopPlayback
-.export LineNumberSpriteStartIndex
+.exportzp LineNumberSpriteStartIndex
 LineNumberSpriteStartIndex = 4
 
 
@@ -91,7 +91,9 @@ SelectingActive: .res 1
 ExpectDoubleTap: .res 1
 
 .segment CompiledPlaybackDataSegment
+; Share the same generic RAM space for both the storage handler and compiled playback
 CompiledPattern:
+StorageBuffer:
 .res $8000
 .res $8000
 
@@ -105,6 +107,12 @@ InitMidScreen:
 	sta PPUBRIGHT
 
 InitEditor:
+;.import TestRleCompression
+;jsl TestRleCompression
+.import StoreSongIntoBuffer
+jsl StoreSongIntoBuffer
+
+
 .export InitEditor
 .import LoadTextGraphics, LoadPalettes
 .import Instrument_Init, Cursor_Init, Pattern_Init, Chain_Init, Song_Init, Samples_Init

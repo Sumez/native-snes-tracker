@@ -13,12 +13,12 @@ MAX_INSTRUMENTS = 53
 
 
 ; Memory addresses
-.global SONG, CHAINS, PHRASES_1, PHRASES_2, INSTRUMENTS, SAMPLES
+.global HEADER, TITLE, AUTHOR, SONG, CHAINS, PHRASES_1, PHRASES_2, INSTRUMENTS, SAMPLES
 .globalzp Input_CustomHandler, Input_NavigateIn, Input_NavigateBack, Input_MoveLeft, Input_MoveUp, Input_MoveRight, Input_MoveDown
 .globalzp Input_StartPlayback, OnPlaybackStopped
 .globalzp Input_StartSelection, Input_EndSelection, Input_CopySelection, Input_CutSelection, Input_Paste, Input_Erase, Input_Clone
 .global Clipboard
-.global CurrentScreen, ExpectDoubleTap, IsPlaying, CompiledPattern, TilemapBuffer, GuiTilemapBuffer, ShowClearBackdrop, ShowPatternBackdrop, BackdropTilemapBuffer, EditMode, UnusedInstruments
+.global CurrentScreen, ExpectDoubleTap, IsPlaying, StorageBuffer, CompiledPattern, TilemapBuffer, GuiTilemapBuffer, ShowClearBackdrop, ShowPatternBackdrop, BackdropTilemapBuffer, EditMode, UnusedInstruments
 .global Notes, Octaves, NotesSharp
 .globalzp SingleNotePatternOffsetInSpcSource ; Unsure about these
 
