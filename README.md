@@ -87,6 +87,10 @@ The control scheme is optimized to the SNES's 12-button D-pad. If you are using 
     - Edit song and author name
     - Assign name, and icon or color to instruments. Assign custom color to phrases and chains for easy recognition
 - Save multiple songs to SRAM. Export/Import songs using Patcher application
+    - Compress/decompress song to save storage space <sup>In progress</sup>
+    - Hold button while starting console to clear work data in SRAM (NOT saved songs) in case of corrupted data
+    - UI for saving/loading multiple songs
+    - Manage save data via the Patcher
 - Simple view that vizualises APU memory used in both compressed and uncompressed form
     - Chain support in sound driver, handle looping from song data
     - `Generate compressed song data from tracker. Use note progression macros and silent blocks`

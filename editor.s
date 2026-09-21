@@ -32,6 +32,7 @@ Clipboard:
 	AUTHOR: .res $40
 	SONG: .res $800 ; $0-FF, 8 channels per row
 	SAMPLES: .res 16*64 ; 64 entries, with an index and 14-char name-check each
+SAMPLES_END:
 	.segment "SRAM2"
 	CHAINS: .res $2000 ; 2 bytes (phrase ref and transpose), 16 rows, $100 different chains of $20 each
 	.segment "SRAM3"
@@ -107,10 +108,8 @@ InitMidScreen:
 	sta PPUBRIGHT
 
 InitEditor:
-;.import TestRleCompression
-;jsl TestRleCompression
-.import StoreSongIntoBuffer
-jsl StoreSongIntoBuffer
+;.import StoreCurrentSong
+;jsl StoreCurrentSong
 
 
 .export InitEditor

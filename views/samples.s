@@ -463,7 +463,7 @@ jmp MarkSampleListUpdated
 
 tryAddSampleToIndex:
 	cpx #(64*2) ; Enforce maximum number of added sample
-	bcc :+; Also: Add up sizes of all added samples to check enforce a max sample size limit
+	bcc :+; TODO: Also: Add up sizes of all added samples to check enforce a max sample size limit
 		seta8
 		jsr PlayMosaic
 		seta16
