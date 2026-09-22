@@ -2,20 +2,32 @@
 
 ## How to use
 If you are experienced in other native trackers, \<insert name here\> should hopefully be familiar to you.
-The control scheme is optimized to the SNES's 12-button D-pad. If you are using an emulator, it is recommended to use an actual video game controller over for more intuitive controls.
+The control scheme is optimized to the SNES's 12-button game pad. If you are using an emulator, it is recommended to use an actual video game controller for more intuitive controls.
 
-**D-pad**: Move the cursor around
+> **D-pad**: Move the cursor around. Hold **R button** to move faster!
 
-**Select**: Hold to access the alternate features of other buttons
-**Start**: Play the section you are currently editing. Starts song from current location, or loops the currently edited phrase indefinitely. Hold *Select* to play the current song from the start no matter where you are
+> **Start**: Play the section you are currently editing. Starts song from current location, or loops the currently edited phrase indefinitely.  
+> Hold **Select** to play the current song from the start, or the current row if you're viewing a specific chain  
 
-**Y**: Inserts value in an empty space, automatically copying the last edited one. Hold to access "edit mode".
-**X**: Deletes any inserted value, or inserts 
+> **Y**: Inserts value in an empty space, automatically copying the last edited one.
+> - Hold down Y and use the **D-pad** to edit the value (up/down skips to the next/last larger set)  
+> - **Hold** Y to hear the selected note in Phrase view  
+> - **Double-tap** to quickly select the next unused entry  
+> - **Select**+Y clones the current chain or phrase into an unused entry 
+>
+> **X**: Erases any inserted value. **Press again** to insert a "Key off" entry in the phrase view  
+> **A**: Navigate to edit selected Chain, Phrase, or Instrument  
+> **B**: Returns to the previous view  
+
+> **L button**: Hold L and use the **D-pad** to make a selection while the button is held  
+> **B** with active selection: Copy the selected blocks  
+> **X** with active selection: Cut the selected blocks (copy and delete)  
+> **Y** while holding **L**: Inserts copied blocks at current cursor position  
 
 ### Immediate roadmap:
 
 - Known bugs
-    - Some times entering the instrument view while song is playing will cause a crash (seems random/timing based)
+    - ~~Some times entering the instrument view while song is playing will cause a crash (seems random/timing based)~~ <sup>Maybe fixed? Kinda wonky</sup>
     - Sample preview in instrument view often experiences garbled sounds
     - When playing back a row in song view, you'll some times experience a visual delay. This happens if every chain on the row is different, making it take a long time to load it into the APU
 - ✅ Revised CPU controlled playback <sup>Done</sup>
@@ -36,9 +48,9 @@ The control scheme is optimized to the SNES's 12-button D-pad. If you are using 
     - Make it visible ("greyed out"?) that a chain/phrase/instrument is "empty"/uncreated where selecting it
     - Hold Delete while moving cursor to delete multiple
     - Allow removing an already empty row in a song view channel to move everything below it up by one. Ideally a way to insert new row as well
-- Playback adjustments according to UI
-    - Select+Start should only play current song row when in the chain view
-    - When a channel in the song playback hits an empty row, it should just loop back to the top used row before an unused one
+- ✅ Playback adjustments according to UI
+    - ~~Select+Start should start at current song row when in the chain view~~ <sup>Done</sup>
+    - ~~When a channel in the song playback hits an empty row, it should just loop back to the top used row before an unused one~~ <sup>Done</sup>
 - Echo filter
     - Set echo variables and enable per-channel using commands
     - Control *maximum* echo delay using a global variable - restricts usage of that specific command
