@@ -106,7 +106,7 @@
     <Pipeline>
       <Type>tilemap.custom</Type>
       <Output>gfx/font.inc</Output>
-      <LastProcessed>2026-06-16T22:32:34.3167217+02:00</LastProcessed>
+      <LastProcessed>2026-09-21T17:38:00.0681851+02:00</LastProcessed>
       <Property>
         <Key>script-type</Key>
         <Value>Python</Value>
@@ -146,7 +146,7 @@
       <Output>gfx/cursor.chr</Output>
       <Output>gfx/cursor.pal</Output>
       <Output>gfx/cursor.map</Output>
-      <LastProcessed>2026-09-15T09:54:33.9410608+02:00</LastProcessed>
+      <LastProcessed>2026-09-22T14:39:24.7159963+02:00</LastProcessed>
       <Property>
         <Key>DiscardRedundant</Key>
         <Value>0</Value>
@@ -177,7 +177,7 @@
       </Property>
       <Property>
         <Key>Palette</Key>
-        <Value>0,0,0,0,0;5,130,121,209,255;3,255,255,255,255;6,223,113,38,255</Value>
+        <Value>0,0,0,0,0;5,130,121,209,255;3,255,255,255,255;10,223,113,38,255</Value>
       </Property>
     </Pipeline>
   </File>
@@ -230,7 +230,7 @@
       <Output>gfx/ui.chr</Output>
       <Output>gfx/ui.pal</Output>
       <Output>gfx/ui.map</Output>
-      <LastProcessed>2024-08-17T13:57:37.6403074+02:00</LastProcessed>
+      <LastProcessed>2026-09-22T14:39:24.7191547+02:00</LastProcessed>
       <Property>
         <Key>DiscardRedundant</Key>
         <Value>0</Value>
@@ -257,11 +257,11 @@
       </Property>
       <Property>
         <Key>ChrType</Key>
-        <Value>Bpp2</Value>
+        <Value>Bpp4</Value>
       </Property>
       <Property>
         <Key>Palette</Key>
-        <Value>1,223,113,38,255;2,153,229,80,255</Value>
+        <Value>9,223,113,38,255;10,153,229,80,255</Value>
       </Property>
     </Pipeline>
   </File>
@@ -439,5 +439,93 @@
     <Id>39</Id>
     <RelativePath>storage.s</RelativePath>
     <Mode>IncludeInAssembly</Mode>
+  </File>
+  <File>
+    <Id>40</Id>
+    <RelativePath>gfx/vwf.png</RelativePath>
+    <Mode>ContentPipeline</Mode>
+    <Pipeline>
+      <Type>chr</Type>
+      <Output>gfx/vwf.chr</Output>
+      <Output>gfx/vwf.pal</Output>
+      <Output>gfx/vwf.map</Output>
+      <LastProcessed>2026-09-22T11:01:31.9993026+02:00</LastProcessed>
+      <Property>
+        <Key>DiscardRedundant</Key>
+        <Value>1</Value>
+      </Property>
+      <Property>
+        <Key>ReducePalette</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>ExportPalette</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>BigTiles</Key>
+        <Value>1</Value>
+      </Property>
+      <Property>
+        <Key>ExportTileMap</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>TileMapAttribute</Key>
+        <Value>0000</Value>
+      </Property>
+      <Property>
+        <Key>ChrType</Key>
+        <Value>Bpp2</Value>
+      </Property>
+      <Property>
+        <Key>Palette</Key>
+        <Value>0,0,0,0,0;2,118,66,138,255;1,255,255,255,255</Value>
+      </Property>
+    </Pipeline>
+  </File>
+  <File>
+    <Id>41</Id>
+    <RelativePath>gfx/font2.png</RelativePath>
+    <Mode>ContentPipeline</Mode>
+    <Pipeline>
+      <Type>chr</Type>
+      <Output>gfx/font2.chr</Output>
+      <Output>gfx/font2.pal</Output>
+      <Output>gfx/font2.map</Output>
+      <LastProcessed>2026-09-21T17:59:25.846306+02:00</LastProcessed>
+      <Property>
+        <Key>DiscardRedundant</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>ReducePalette</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>ExportPalette</Key>
+        <Value>1</Value>
+      </Property>
+      <Property>
+        <Key>BigTiles</Key>
+        <Value>1</Value>
+      </Property>
+      <Property>
+        <Key>ExportTileMap</Key>
+        <Value>0</Value>
+      </Property>
+      <Property>
+        <Key>TileMapAttribute</Key>
+        <Value>0000</Value>
+      </Property>
+      <Property>
+        <Key>ChrType</Key>
+        <Value>Bpp2</Value>
+      </Property>
+      <Property>
+        <Key>Palette</Key>
+        <Value>0,0,0,0,255;2,64,72,128,255;1,192,216,248,255</Value>
+      </Property>
+    </Pipeline>
   </File>
 </BrewmasterProject>

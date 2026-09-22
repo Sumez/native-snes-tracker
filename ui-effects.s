@@ -32,7 +32,7 @@ Init:
 	ldx #HighlightSpriteStartIndex*4 ; index of first row-highlight sprite
 	:		
 		@palette = 1
-		@priority = 0
+		@priority = 3
 		lda #(@palette<<1|@priority<<4)
 		sta OamBuffer+3,X
 		sta OamBuffer+3+4,X
@@ -111,13 +111,15 @@ Update_Vblank:
 	
 	:
 	
-	;lda ShowBg3
-	;beq :+
-		lda #%00010111
-	;	bra :++
-	;:
-	;	lda #%00010011
-	;:
+	lda EditMode
+	beq :+
+		lda IsPlaying
+		bne :+
+			lda #%00010000
+			bra :++
+	:
+		lda #%00000000
+	:
 	sta BLENDMAIN
 
 rts
@@ -159,7 +161,7 @@ rts
 
 HighlightTiles:
 .repeat $20
-.word $14de
+.word $0800|Backdrop_MARKED
 .endrepeat
 rts
 

@@ -2,6 +2,8 @@
 .define GAME_TITLE "SuperTrax94"
 
 MAX_INSTRUMENTS = 53
+Backdrop_CLEAR = $61
+Backdrop_MARKED = $60
 
 .define TilemapBufferSegment "BSS7E"
 .define ClipboardSegment "BSS7E"
@@ -30,7 +32,8 @@ Selection_Width = 4
 Selection_Height = 6
 
 ; Global routines
-.global NavigateToScreen, NavigateToPreviousScreen, WriteTilemapHeader, WriteTilemapHeaderId
+.global NavigateToScreen, NavigateToPreviousScreen, WriteTilemapText, WriteTilemapHeader, WriteTilemapHeaderId
+.global BufferNewString, BufferString, PrintBufferedString, WriteTextToTilemapIndex, WriteTextToHeader, ResetVwfText, Vwf_RecordRestorePoint, Vwf_ReturnToRestorePoint
 
 ; Playback stuff
 .global PlayFullSong
@@ -213,6 +216,17 @@ Bg4ChrBase = $0000
     jsr LoadVRAM
 .endmacro
 
+.macro LoadOffsetBlockToVRAM srcBank, srcPointer, destinationPointer, size
+    lda #INC_DATAHI
+    sta PPUCTRL       ; Set VRAM transfer mode to word-access, increment by 1
+    ldx destinationPointer         ; DEST
+    stx PPUADDR       ; $2116: Word address for accessing VRAM.
+    lda #srcBank        ; SRCBANK
+    ldx srcPointer         ; SRCOFFSET
+    ldy #size         ; SIZE
+    jsr LoadVRAM
+.endmacro
+
 .macro LoadBlockToOffsetVRAM srcAddr, destinationPointer, size
     lda #$80
     sta PPUCTRL       ; Set VRAM transfer mode to word-access, increment by 1
@@ -316,6 +330,8 @@ Bg4ChrBase = $0000
 .charmap '7',$47
 .charmap '8',$48
 .charmap '9',$49
+.charmap '(',$4a
+.charmap ')',$4b
 
 .smart
 

@@ -44,7 +44,7 @@ UpdateCursorSpriteAndHighlight:
 	and #2 ; Only cursor ID 0 or 2 allowed so far
 	tay
 	seta8
-	lda #$20
+	lda #(4<<2)|$20
 	ldx PrevCursorPositionOffset,Y
 	jsr SetPaletteValues ; Reset highlight from previous position
 
@@ -60,7 +60,7 @@ UpdateCursorSpriteAndHighlight:
 	sta PrevCursorPositionOffset,Y
 	tax
 	seta8
-	lda #(1<<2)|$20
+	lda #(5<<2)|$20
 	jsr SetPaletteValues ; Set highlight for current position
 	
 	
@@ -117,7 +117,7 @@ UpdateCursorSpriteAndHighlight:
 		lda #10 ; Sprite tile index
 		sta OamBuffer+2
 	:
-	ldy #%00000000
+	ldy #(%00110000)
 	lda EditMode
 	beq :+
 		ldy #(%00110000|2) ; High priority + light palette
@@ -154,11 +154,12 @@ UpdateCursorSpriteAndHighlight:
 	
 rts
 
+
 MarkSelectionArea:
-	lda #$de
+	lda #Backdrop_MARKED
 	jmp fillSelectionArea
 ClearSelectionArea:
-	lda #$df
+	lda #Backdrop_CLEAR
 fillSelectionArea:
 
 	pha ; Store A (tile index) until later

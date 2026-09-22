@@ -15,7 +15,8 @@ The control scheme is optimized to the SNES's 12-button D-pad. If you are using 
 ### Immediate roadmap:
 
 - Known bugs
-    - Navigating out of the instrument view after selecting a new sample often results in a crash
+    - Some times entering the instrument view while song is playing will cause a crash (seems random/timing based)
+    - Sample preview in instrument view often experiences garbled sounds
     - When playing back a row in song view, you'll some times experience a visual delay. This happens if every chain on the row is different, making it take a long time to load it into the APU
 - ✅ Revised CPU controlled playback <sup>Done</sup>
     - ~~Start playback from any location in song~~ <sup>Done</sup>
@@ -48,13 +49,13 @@ The control scheme is optimized to the SNES's 12-button D-pad. If you are using 
     - ~~Save up sprite slots by having 32x32 sprites (a row playing in song view on all channels will now use 16 sprites plus potentially 2 from the cursor. Could easily be just 9)~~ <sup>Improved</sup>
         - ~~Did the opposite and wasted sprite slots by making mid-size cursor using up 3 sprites instead of 2. I changed sprite sizes to 8/16 though, so I would use fewer 8px slices and prevent overflow blanking out sprites~~
     - Visible UI hints for easier navigation
-    - ~~Row and column labels~~ <sup>Done/sup>
+    - ~~Row and column labels~~ <sup>Done</sup>
         - ~~Use sprites to display row indexes on song view?~~
     - Show more useful information on song view instead of having so many visible rows (maybe toggle-able?)
         - BPM, Song metadata, etc.
-    - ~~Highlight columns instead of rows on song view <sup>Decided against this. It looks nice as it is~~</sup>
-    - `Convert tracker font to 2bpp and move to BG3 layer, use BG2 for UI graphics`
-    - `Dynamic variable width font for UI elements`
+    - ~~Highlight columns instead of rows on song view~~ <sup>Decided against this. It looks nice as it is</sup>
+    - ~~`Convert tracker font to 2bpp and move to BG3 layer, use BG2 for UI graphics`~~ <sup>Done</sup>
+    - ~~`Dynamic variable width font for UI elements`~~ <sup>Done</sup>
 - Basic tracker commands
     - Implement the ones already supported in the sound driver first - Pitch up/down, volume slide, arpeggio - loop and tempo change should be in song data instead? <sup>Partly implemented</sup>
         - ~~Pitch up/down~~

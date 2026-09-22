@@ -4,7 +4,7 @@
 .import PlaySingleChain
 
 .segment "CODE7"
-Name: .byte "Chain_-_",$ff
+Name: .byte "CHAIN_-_",$ff
 
 .segment UnusedItemsSegment
 UnusedPhrases: .res $100
@@ -49,9 +49,10 @@ FocusView:
 	sta SelectionStart
 
 	ldy #.loword(Name)
-	jsl WriteTilemapHeader
+	jsl BufferNewString
 	lda CurrentChainIndex
 	jsl WriteTilemapHeaderId
+	jsl PrintBufferedString
 
 	Bind Input_StartPlayback, StartPlayback
 	Bind Input_CustomHandler, HandleInput
@@ -115,6 +116,7 @@ rtl
 JumpToChildView:
 	ldx ChildTilemapOffset
 	stx z:LoadView_TilemapOffset
+	;jsl ResetVwfText ; (not necessary because it always resets when going back to chain view anyway)
 	jsr Pattern_FocusView
 rtl
 

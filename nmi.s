@@ -45,17 +45,25 @@ stz NMITEST
 
 
 
-.import CopyEntireTilemap, CopyBackdropTilemap, CopyGuiTilemap, UpdateGui
+.importzp BufferedVwfTiles
+.import CopyEntireTilemap, CopyBackdropTilemap, CopyGuiTilemap, UpdateGui, CopyVwfTiles
+
+lda BufferedVwfTiles
+beq :+
+	jsl CopyVwfTiles
+	bra @endConditionalUpdates ; Don't copy tilemap or GUI until no Vwf is buffered anymore
+:
 jsl CopyEntireTilemap ; TODO: just queue updated rows?
 lda UpdateGui
 beq :+
 	; Updates the entire GUI view (only when navigating)
 	jsl CopyGuiTilemap
-	bra :++
+	bra @endConditionalUpdates
 :
 	; Updates BG3 (the colored background tiles) which indicate every 4th, playback status, and selected blocks
 	jsl CopyBackdropTilemap
-:
+
+@endConditionalUpdates:
 
 	jsr Vfx_Update_Vblank
 
@@ -149,9 +157,9 @@ UpdateInputStates:
 	ldy #@DasRepeat
 	lda JOY1CUR
 	sta ButtonStates
-	bit #KEY_L
+	bit #KEY_R
 	beq :+
-		ldy #1 ; Fast repeat with L held
+		ldy #1 ; Fast repeat with R held
 	:
 	bit #KEY_DOWN
 	beq :+

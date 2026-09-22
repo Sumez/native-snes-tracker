@@ -3,13 +3,19 @@
 
 .segment "CODE7"
 PatternPalette:
-.incbin "gfx/font.inc.0.pal"
+.incbin "gfx/font.inc.0.pal",0,24
+.word $0000, $7fff, $252e, $0000 ; Palette used by UI text on panel backgrounds (unused)
 PatternPaletteHighlight:
-.incbin "gfx/font.inc.1.pal"
+.incbin "gfx/font2.pal",0,6		; Normal unhilit cell
+.word $4b3f ; Color used for row number sprites
+.word $0000, $7fff, $7a50, $7dbe ; Highlit cell
+.word $0000, $0000, $38A0, $0000 ; backdrop stuff
+.word $0000, $127d, $0133, $0000 ; Unused instrument
 PatternPaletteDim:
 .incbin "gfx/font.inc.2.pal"
 GuiPalette:
-.incbin "gfx/gui.inc.0.pal"
+.incbin "gfx/gui.inc.0.pal",0,16
+.word $0000, $0000, $4128, $0000 ; 3rd index is used by the row highlighting currentply playing phrase bar
 
 
 .export LoadVRAM, LoadOAM

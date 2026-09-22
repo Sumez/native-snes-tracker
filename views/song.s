@@ -3,7 +3,7 @@
 .smart
 
 .segment "CODE7"
-Name: .byte "Song",$ff
+Name: .byte "(Untitled_song)",$ff
 
 .segment UnusedItemsSegment
 UnusedChains: .res $100
@@ -59,7 +59,7 @@ FocusView:
 	sty SelectionStart
 	
 	ldy #.loword(Name)
-	jsl WriteTilemapHeader
+	jsl WriteTextToHeader
 	jsl ShowCursor_long
 	jsl SongScrolled_long
 rts

@@ -6,10 +6,14 @@
 .import StopPlayback, PrepareTestPatternPlayback, SwitchToSingleNoteMode, PlaySingleNote
 
 .segment "CODE7"
-Name_Existing: .byte "Instrument____-_no_name",$ff
+Name_Existing: .byte "INSTRUMENT_-_",$ff
+Name_NoName: .byte "_-_no_name",$ff
 Name_New: .byte "New_instrument",$ff
 
+.segment TilemapBufferSegment
+;NO: SampleNameBuffer: .res 15 ; Put in same segment as the tilemap buffer because our DB is set to that bank while buffering song names
 .segment "BSS"
+SampleNameBuffer: .res 15 ; Put in same segment as the tilemap buffer because our DB is set to that bank while buffering song names
 
 ;SampleIndex = INSTRUMENTS+0
 ;PitchAdjust	= INSTRUMENTS+1
@@ -20,7 +24,7 @@ UNUSED		= INSTRUMENTS+7
 
 ;Loaded when view loads:
 CursorPosition: .res 1
-CurrentInstrumentIndex: .res 1
+CurrentInstrumentIndex: .res 2
 CurrentInstrumentOffset: .res 2
 SampleDirectoryIndex: .res 2
 PreviousAddedSampleIndex: .res 2
@@ -73,21 +77,27 @@ FocusView:
 	stz IsTransfering
 	stz BufferPreviewSound
 	jsl PrepareTestPatternPlayback
+jsl StopPlayback_long ; STOP PLAYBACK before doing anything else, to prevent random crashes
 	jsl BufferSamplePlayback
 	jsl Samples_PrepareSampleEdit
 	
-	ldy #.loword(Name_New)
-	jsl WriteTilemapHeader
-
 	lda PreviousAddedSampleIndex
 	cmp #$ff
 	beq :+
 		ldy #.loword(Name_Existing)
-		jsl WriteTilemapHeader
-		ldx #$9E+$40
+		jsl BufferNewString
 		lda CurrentInstrumentIndex
 		jsl WriteTilemapHeaderId
+		ldy #.loword(Name_NoName)
+		jsl BufferString
+		jsl PrintBufferedString
+		bra :++
 	:
+		ldy #.loword(Name_New)
+		jsl WriteTextToHeader
+	:
+	jsl Vwf_RecordRestorePoint
+	jsl UpdateTilemapBuffer
 
 	Bind Input_StartPlayback, NoAction
 	Bind Input_CustomHandler, HandleInput
@@ -99,7 +109,7 @@ FocusView:
 	jsl ShowCursor_long
 rts
 
-.export Instrument_LoadView = LoadView
+;.export Instrument_LoadView = LoadView
 LoadView:
 	ldx z:LoadView_TilemapOffset
 	stx TilemapOffset
@@ -111,6 +121,7 @@ LoadView:
 	cmp #$ff
 	beq @dontLoadInstrument
 		sta CurrentInstrumentIndex
+		stz CurrentInstrumentIndex+1 ; keep 0 in high byte so index can be used in Y register
 		
 		; DEFAULTS:
 		lda #$50
@@ -170,7 +181,6 @@ LoadView:
 
 	stz WasChanged
 	jsl WriteBaseTilemapBuffer
-	jsl UpdateTilemapBuffer
 	
 	ldx #4
 	jsl LoadGuiMap
@@ -337,6 +347,35 @@ Tilemap_TestNote = TilemapBuffer+MenuOffset1
 rtl
 
 PrintSampleName:
+	phb ; TODO: Wasteful changing of DB register
+	lda #$87
+	pha
+	plb
+
+	;phx
+	ldx #0
+	ldy #0 ; Loop through sample name
+	@nameLoop:
+		lda [CurrentSampleAddress],Y
+		sta SampleNameBuffer,X
+		cmp #$ff
+		beq :+
+		inx
+		iny
+		cpy #14 ; Max name length
+	bne @nameLoop
+	lda #$ff
+	sta SampleNameBuffer,X
+	:
+	
+	jsl Vwf_ReturnToRestorePoint
+	;plx
+	ldx TilemapOffset
+	ldy #.loword(SampleNameBuffer)
+	jsl WriteTextToTilemapIndex
+	plb
+rts
+PrintSampleNameOld:
 	ldy #0 ; Loop through sample name
 	@nameLoop:
 		lda [CurrentSampleAddress],Y
@@ -360,6 +399,7 @@ PrintSampleName:
 	bne @padEndLoop
 rts
 
+
 PrintText:
 @loop:
 	lda f:Text,X
@@ -368,7 +408,7 @@ PrintText:
 		rts
 	:
 	sta TilemapBuffer+10,Y
-	lda #$20
+	lda #$20|$4<<2
 	sta TilemapBuffer+11,Y
 	iny
 	iny
@@ -430,7 +470,6 @@ BufferSamplePlayback:
 	; !!!!!!!!!!!!!!!!!! IMPORTANT: TODO: Either buffer transfer until current playback stopped, or find a way to seamlessly change sample ref during playback !!!!!!
 	ldy CurrentSampleSize
 	jsr BeginFragmentedTransfer
-
 	jsr UpdateTestInstrument
 	lda #1
 	sta IsTransfering
@@ -492,13 +531,14 @@ ShowCursor:
 	lda #24
 	sta HighlightLength
 
-	stz CursorX
+	lda CursorXOffsets,X
+	sta CursorX
 	
 	lda CursorYOffsets,X
 	sta CursorY
 
-	;lda CursorSizes,X
-	lda #1
+	lda CursorSizes,X
+	;lda #1
 	sta CursorSize
 
 	lda #0
@@ -538,6 +578,10 @@ MenuLines:
 .addr MenuOffset0,MenuOffset1,MenuOffset2,MenuOffset3,MenuOffset4
 CursorYOffsets:
 .byte MenuRow0,MenuRow1,MenuRow2,MenuRow3,MenuRow4
+CursorXOffsets:
+.byte $1f, 0, 0, 1, 1
+CursorSizes:
+.byte 1,2,2,2,2
 
 PreviewInstrument:
 	stz BufferPreviewSound
@@ -958,8 +1002,8 @@ SaveChanges:
 	ldx CurrentInstrumentOffset
 	lsr
 	sta f:INSTRUMENTS+0,X
-	ldy CurrentInstrumentIndex
 	eor #$ff
+	ldy CurrentInstrumentIndex
 	sta UnusedInstruments,Y
 
 	lda PreviousAddedSampleIndex
@@ -1030,3 +1074,6 @@ RemoveAddedSampleIfUnused:
 	
 	@found: ; An instrument uses the sample. Do nothing
 rts
+
+StopPlayback_long: jsr StopPlayback
+rtl

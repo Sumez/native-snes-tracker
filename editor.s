@@ -90,6 +90,7 @@ PreviousScreen: .res 1
 ResetStack: .res 2
 SelectingActive: .res 1
 ExpectDoubleTap: .res 1
+BufferedNumber: .res 3 ; Two hex digits and $FF
 
 .segment CompiledPlaybackDataSegment
 ; Share the same generic RAM space for both the storage handler and compiled playback
@@ -174,9 +175,9 @@ stx ScrollY ; TODO: Dedicated GUI handler?
 
 	lda #Bg1TileMapBase >> 9 | 0
 	sta NTADDR       ; Set BG1's Tile Map VRAM offset to $0800 (word address) and the Tile Map size to 32x32tiles
-	lda #Bg2TileMapBase >> 9 | 2
-	sta NTADDR+1       ; Set BG2's Tile Map VRAM offset to $f000 (word address) and the Tile Map size to 32x64tiles
 	lda #Bg3TileMapBase >> 9 | 2
+	sta NTADDR+1       ; Set BG2's Tile Map VRAM offset to $f000 (word address) and the Tile Map size to 32x64tiles
+	lda #Bg2TileMapBase >> 9 | 2
 	sta NTADDR+2       ; Set BG3's Tile Map VRAM offset to $f000 (word address) and the Tile Map size to 32x64tiles
 
 	lda #Bg1ChrBase >> 13 | Bg2ChrBase >> 9
@@ -193,14 +194,14 @@ stx ScrollY ; TODO: Dedicated GUI handler?
 
 	;lda #%00000111
 	;lda #%00010100
-	lda #%00010011
-	sta BLENDMAIN
 	lda #%00000000
+	sta BLENDMAIN
+	lda #%00010111
 	sta BLENDSUB
 	
-	lda #%00110000
+	lda #%00000010
 	sta CGWSEL
-	lda #%00000000
+	lda #%00100000
 	sta ColorBlend
 	sta CGADSUB
 
@@ -414,7 +415,7 @@ rtl
 LoadBackdropUi:
 	seta16
 	;lda #($3f*2) ; Blank space - * 2 because it's 2bpp
-	lda #$08df
+	lda #$0400|Backdrop_CLEAR
 	ldx #((32*32*2)-2)
 	:
 		sta f:BackdropTilemapBuffer,x
@@ -426,7 +427,7 @@ rtl
 ShowPatternBackdrop:
 	lda #1
 	sta ShowBg3
-	lda #$04
+	lda #$00
 	ldx #$0FE+$C0+$24
 	:
 		sta f:BackdropTilemapBuffer+1,x
@@ -464,7 +465,7 @@ ShowClearBackdrop:
 	:
 	stz ShowBg3
 	;lda #($3f*2) ; Blank space - * 2 because it's 2bpp
-	lda #$08
+	lda #$04
 	ldx #$0FE+$C0+$24
 	:
 		sta f:BackdropTilemapBuffer+1,x
@@ -497,7 +498,7 @@ rts
 
 ClearTilemap:
 	seta16
-	lda #'_' ; Blank space
+	lda #'_'|(4<<10)|($20<<8) ; Blank space, palette 4, priority
 	ldx #((32*32*2)-2)
 	:
 		sta f:TilemapBuffer,x
@@ -508,12 +509,14 @@ ClearTilemap:
 rts
 
 WriteTilemapHeader:
+	ldx #$C8
+WriteTilemapText:
 	sty 0
 	ldy #0
-	ldx #$C8
 	:
 		lda (0),y
-		bpl :+
+		cmp #$ff
+		bne :+
 			rtl
 		:
 		sta f:TilemapBuffer,x
@@ -530,18 +533,24 @@ WriteTilemapHeaderId:
 	lsr
 	lsr
 	ora #$40
-	sta f:TilemapBuffer,x
+	sta BufferedNumber+0
+	;sta f:TilemapBuffer,x
 	pla
 	and #$0F
 	ora #$40
-	sta f:TilemapBuffer+2,x
-rtl
+	sta BufferedNumber+1
+	;sta f:TilemapBuffer+2,x
+	lda #$ff
+	sta BufferedNumber+2
+	ldy #.loword(BufferedNumber)
+jml BufferString
 
 
 LoadView:
 	jsr ClearTilemap
 	;stz ShowBg3
 	jsr ShowClearBackdrop
+	jsl ResetVwfText
 	stz SelectingActive
 	stz ExpectDoubleTap
 	ldx #$1C8
@@ -591,8 +600,8 @@ HandleInput:
 	lda ButtonPushed
 	and #KEY_R
 	beq :+
-		lda #$11
-		jmp NavigateToScreen
+		;lda #$11
+		;jmp NavigateToScreen
 	:
 
 	lda ButtonStates+1

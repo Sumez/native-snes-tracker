@@ -30,7 +30,7 @@ Command_SoundEffectQ = 6
 Command_TransferEnd = $ff
 
 .zeropage
-Temp: .res 6
+Temp: .res 7
 .bss
 TransferState: .res 1
 LastCommByte: .res 1

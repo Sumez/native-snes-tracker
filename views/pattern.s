@@ -5,7 +5,7 @@
 .import UpdateNoteInPlayback, NoteDataOffsetInPhrase
 
 .segment "CODE7"
-Name: .byte "Phrase_-_",$ff
+Name: .byte "PHRASE_-_",$ff
 
 .segment "BSS"
 
@@ -65,9 +65,10 @@ FocusView:
 
 	jsl PrepareTestPatternPlayback
 	ldy #.loword(Name)
-	jsl WriteTilemapHeader
+	jsl BufferNewString
 	lda CurrentPhraseIndex
 	jsl WriteTilemapHeaderId
+	jsl PrintBufferedString
 
 	Bind Input_StartPlayback, StartPlayback
 	Bind Input_CustomHandler, HandleInput
@@ -104,6 +105,9 @@ LoadView:
 rts
 .export Pattern_HideView = HideView
 HideView:
+	ldx z:LoadView_TilemapOffset
+	stx TilemapOffset
+
 	; Hides the pattern bars on the right side, if cursor is over en empty entry on the chain view on the left
 	jsl WriteEmptyTilemapBuffer
 	;stz ShowBg3
@@ -352,10 +356,10 @@ ldy #0
 		
 		lda UnusedInstruments, Y
 		bne :+
-			lda #2<<2
+			lda #$20|(7<<2) ; Unused instrument palette
 			bra :++
 		:
-			lda #0
+			lda #$30 ; Default palette
 		:
 		sta f:TilemapBuffer+9,X
 		sta f:TilemapBuffer+11,X
@@ -388,6 +392,9 @@ ldy #0
 		sta f:TilemapBuffer+8,x
 		lda #$1f
 		sta f:TilemapBuffer+10,x
+		lda #$30 ; Default palette
+		sta f:TilemapBuffer+9,X
+		sta f:TilemapBuffer+11,X
 
 	:
 	;phx
