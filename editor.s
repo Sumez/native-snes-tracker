@@ -573,6 +573,7 @@ ViewLoaders: .import Song_FocusView, Chain_FocusView, Pattern_FocusView, Instrum
 
 .segment "CODE7"
 
+.import PlaySongFromSelectedRow
 NoAction: rts
 HandleInput:
 
@@ -581,11 +582,14 @@ HandleInput:
 	beq @didNotPushStart
 	
 		lda IsPlaying
-		bne :++
+		bne :+++
 			lda ButtonStates+1
 			bit #>KEY_SELECT
-			beq :+
-				lda #0
+			beq :++
+				lda CurrentScreen
+				beq :+
+					jmp PlaySongFromSelectedRow
+				:
 				jmp PlayFullSong
 			:			
 			jmp (Input_StartPlayback)

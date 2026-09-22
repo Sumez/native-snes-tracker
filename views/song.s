@@ -151,8 +151,9 @@ PreparePlayback:
 	;jsr TransferEntirePlaybackBufferToSpc
 rts
 
+.export PlaySongFromSelectedRow
 PlaySongFromSelectedRow:
-	lda CursorPosition ; Low byte tells which row we are one
+	lda CursorPosition ; Low byte tells which row we are on
 jmp PlayFullSong
 
 ChainIndexWasChanged:

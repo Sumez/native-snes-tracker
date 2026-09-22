@@ -256,7 +256,7 @@ PlayFullSong:
 	; Initialize chains with row 0 of each channel in song
 	seta16
 	ldy #0
-	:
+	@channelLoop:
 		tya
 		xba
 		lsr
@@ -265,13 +265,20 @@ PlayFullSong:
 		tax
 		dex ; channel progress always starts at the "end" of a chain, so decrease X once, so when the next song row is loaded, it will be the first
 		stx z:SongRowOfChannel,Y
-		ldx #0 ; Forces "CompileSongRowToBuffer" to load the next song row first
+inx
+lda f:SONG,X
+ldx #0 ; Forces "CompileSongRowToBuffer" to load the next song row first
+and #$ff
+cmp #$ff
+bne :+
+	ldx #$ffff ; Force silence on channel
+:
 		stx z:ChainOffsetOfChannel,Y
 
 		iny
 		iny
 		cpy #16
-	bne :-
+	bne @channelLoop
 	seta8
 
 	jsl CopyCurrentSongToSpcBuffer
@@ -859,11 +866,23 @@ CopyCurrentSongToSpcBuffer:
 rtl
 
 InitiateChannelIndexes:
+@currentChannelMinimum = 0
 .a16
-	tya
-	xba
-	lsr
-	tax
+	; Rewind X until we find the first row in current block
+	; TODO: Just cache this value and only refresh when changes are made to the song setup
+	txa
+	and #$ff00
+	sta @currentChannelMinimum ; $000, $100, $200, etc
+	seta8
+	:
+		dex
+		cpx @currentChannelMinimum
+		beq :+
+		lda f:SONG-1,X ; Check row BEFORE current X
+		cmp #$ff
+	bne :-
+	:
+	seta16
 	stx z:SongRowOfChannel,y
 	lda f:SONG,X
 	and #$ff
