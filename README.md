@@ -1,8 +1,8 @@
 # Native SNES Tracker (name pending)
 
 ## How to use
-If you are experienced in other native trackers, \<insert name here\> should hopefully be familiar to you.
-The control scheme is optimized to the SNES's 12-button game pad. If you are using an emulator, it is recommended to use an actual video game controller for more intuitive controls.
+If you are experienced in other native trackers, \<insert name here\> should hopefully be familiar to you.  
+The control scheme is optimized to the SNES's 12-button game pad.  If you are using an emulator, it is recommended to use an actual video game controller for more intuitive controls.
 
 > **D-pad**: Move the cursor around. Hold **R button** to move faster!
 
@@ -12,8 +12,8 @@ The control scheme is optimized to the SNES's 12-button game pad. If you are usi
 > **Y**: Inserts value in an empty space, automatically copying the last edited one.
 > - Hold down Y and use the **D-pad** to edit the value (up/down skips to the next/last larger set)  
 > - **Hold** Y to hear the selected note in Phrase view  
-> - **Double-tap** to quickly select the next unused entry  
-> - **Select**+Y clones the current chain or phrase into an unused entry 
+> - **Double-tap** to quickly select the next unused chain or phrase  
+> - **Select**+Y clones the current chain or phrase into an unused index 
 >
 > **X**: Erases any inserted value. **Press again** to insert a "Key off" entry in the phrase view  
 > **A**: Navigate to edit selected Chain, Phrase, or Instrument  
@@ -22,7 +22,7 @@ The control scheme is optimized to the SNES's 12-button game pad. If you are usi
 > **L button**: Hold L and use the **D-pad** to make a selection while the button is held  
 > **B** with active selection: Copy the selected blocks  
 > **X** with active selection: Cut the selected blocks (copy and delete)  
-> **Y** while holding **L**: Inserts copied blocks at current cursor position  
+> **Y** while holding **L**: Inserts copied blocks at current cursor position (potentially overriding what was there - be careful) 
 
 ### Immediate roadmap:
 

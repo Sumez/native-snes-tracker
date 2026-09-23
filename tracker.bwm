@@ -106,7 +106,7 @@
     <Pipeline>
       <Type>tilemap.custom</Type>
       <Output>gfx/font.inc</Output>
-      <LastProcessed>2026-09-21T17:38:00.0681851+02:00</LastProcessed>
+      <LastProcessed>2026-09-24T00:01:21.9112775+02:00</LastProcessed>
       <Property>
         <Key>script-type</Key>
         <Value>Python</Value>
@@ -146,7 +146,7 @@
       <Output>gfx/cursor.chr</Output>
       <Output>gfx/cursor.pal</Output>
       <Output>gfx/cursor.map</Output>
-      <LastProcessed>2026-09-22T14:39:24.7159963+02:00</LastProcessed>
+      <LastProcessed>2026-09-24T00:08:26.6170308+02:00</LastProcessed>
       <Property>
         <Key>DiscardRedundant</Key>
         <Value>0</Value>
@@ -177,7 +177,7 @@
       </Property>
       <Property>
         <Key>Palette</Key>
-        <Value>0,0,0,0,0;5,130,121,209,255;3,255,255,255,255;10,223,113,38,255</Value>
+        <Value>0,0,0,0,0;2,130,121,209,255;3,255,255,255,255;15,223,113,38,255;1,102,57,49,255</Value>
       </Property>
     </Pipeline>
   </File>
@@ -230,7 +230,7 @@
       <Output>gfx/ui.chr</Output>
       <Output>gfx/ui.pal</Output>
       <Output>gfx/ui.map</Output>
-      <LastProcessed>2026-09-22T14:39:24.7191547+02:00</LastProcessed>
+      <LastProcessed>2026-09-23T23:01:54.5293357+02:00</LastProcessed>
       <Property>
         <Key>DiscardRedundant</Key>
         <Value>0</Value>
@@ -419,7 +419,7 @@
     <Pipeline>
       <Type>tilemap.custom</Type>
       <Output>gfx/gui.inc</Output>
-      <LastProcessed>2026-09-11T15:50:19.0126205+02:00</LastProcessed>
+      <LastProcessed>2026-09-23T13:01:27.2725209+02:00</LastProcessed>
       <Property>
         <Key>script-type</Key>
         <Value>Python</Value>
@@ -493,7 +493,7 @@
       <Output>gfx/font2.chr</Output>
       <Output>gfx/font2.pal</Output>
       <Output>gfx/font2.map</Output>
-      <LastProcessed>2026-09-21T17:59:25.846306+02:00</LastProcessed>
+      <LastProcessed>2026-09-23T15:23:55.0426944+02:00</LastProcessed>
       <Property>
         <Key>DiscardRedundant</Key>
         <Value>0</Value>
@@ -525,6 +525,24 @@
       <Property>
         <Key>Palette</Key>
         <Value>0,0,0,0,255;2,64,72,128,255;1,192,216,248,255</Value>
+      </Property>
+    </Pipeline>
+  </File>
+  <File>
+    <Id>42</Id>
+    <RelativePath>gfx/gui2.bwmap</RelativePath>
+    <Mode>ContentPipeline</Mode>
+    <Pipeline>
+      <Type>tilemap.custom</Type>
+      <Output>gfx/gui2.inc</Output>
+      <LastProcessed xsi:nil="true" />
+      <Property>
+        <Key>script-type</Key>
+        <Value>Python</Value>
+      </Property>
+      <Property>
+        <Key>script-file</Key>
+        <Value>gfx/stage-convert.py</Value>
       </Property>
     </Pipeline>
   </File>

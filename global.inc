@@ -4,6 +4,7 @@
 MAX_INSTRUMENTS = 53
 Backdrop_CLEAR = $61
 Backdrop_MARKED = $60
+ChildViewOffsetInTiles = 10
 
 .define TilemapBufferSegment "BSS7E"
 .define ClipboardSegment "BSS7E"

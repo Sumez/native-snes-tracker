@@ -1245,7 +1245,7 @@ UpdateHighlight_long: jsr UpdateBeatHighlight
 rtl
 UpdateBeatHighlight:
 	lda IsPlaying
-	bcc @removeHighlight
+	beq @removeHighlight
 	ldy #0
 	lda CurrentPhraseIndex
 	:

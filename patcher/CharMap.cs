@@ -35,6 +35,8 @@ public static class CharMap
 			'-' => 0x3B,
 			'~' => 0x3E,
 			' ' => 0x3F,
+			'(' => 0x4A,
+			')' => 0x4B,
 			_ => 0x3F,
 		};
 	}

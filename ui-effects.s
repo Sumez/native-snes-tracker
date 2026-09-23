@@ -31,7 +31,7 @@ Init:
 	xba
 	ldx #HighlightSpriteStartIndex*4 ; index of first row-highlight sprite
 	:		
-		@palette = 1
+		@palette = 0
 		@priority = 3
 		lda #(@palette<<1|@priority<<4)
 		sta OamBuffer+3,X
@@ -83,17 +83,17 @@ Update_Vblank:
 		stz CGDATA
 		stz CGDATA
 
-		lda #$09
-		sta CGADDR
-		writeColor @beatRowDark
+		;lda #$09
+		;sta CGADDR
+		;writeColor @beatRowDark
 		bra :++
 	:
 		stz CGADDR
-		writeColor rgb(1,3,4)
+		writeColor rgb(2,1,0)
 
-		lda #$09
-		sta CGADDR
-		writeColor @beatRowPlaying
+		;lda #$09
+		;sta CGADDR
+		;writeColor @beatRowPlaying
 		
 		lda ShowBg3
 		beq :+

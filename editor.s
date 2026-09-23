@@ -428,34 +428,21 @@ ShowPatternBackdrop:
 	lda #1
 	sta ShowBg3
 	lda #$00
-	ldx #$0FE+$C0+$24
-	:
-		sta f:BackdropTilemapBuffer+1,x
-		inx
-		inx
-		cpx #$116+$C0+$24
-	bne :-
-	ldx #$1FE+$C0+$24
-	:
-		sta f:BackdropTilemapBuffer+1,x
-		inx
-		inx
-		cpx #$216+$C0+$24
-	bne :-
-	ldx #$2FE+$C0+$24
-	:
-		sta f:BackdropTilemapBuffer+1,x
-		inx
-		inx
-		cpx #$316+$C0+$24
-	bne :-
-	ldx #$3FE+$C0+$24
-	:
-		sta f:BackdropTilemapBuffer+1,x
-		inx
-		inx
-		cpx #$416+$C0+$24
-	bne :-
+	DrawToBeatLines:
+	@offset = (ChildViewOffsetInTiles*2)+(3*2) ; Child view offset + 24px left margin
+	@length = 12*2
+	@distance = $100 ; = 4 rows of tiles
+	@start .set $1C0
+	.repeat 4
+		ldx #@start+@offset
+		:
+			sta f:BackdropTilemapBuffer+1,x
+			inx
+			inx
+			cpx #@start+@offset+@length
+		bne :-
+		@start .set (@start + @distance)
+	.endrepeat
 rts
 ShowClearBackdrop:
 	lda ShowBg3
@@ -466,35 +453,7 @@ ShowClearBackdrop:
 	stz ShowBg3
 	;lda #($3f*2) ; Blank space - * 2 because it's 2bpp
 	lda #$04
-	ldx #$0FE+$C0+$24
-	:
-		sta f:BackdropTilemapBuffer+1,x
-		inx
-		inx
-		cpx #$116+$C0+$24
-	bne :-
-	ldx #$1FE+$C0+$24
-	:
-		sta f:BackdropTilemapBuffer+1,x
-		inx
-		inx
-		cpx #$216+$C0+$24
-	bne :-
-	ldx #$2FE+$C0+$24
-	:
-		sta f:BackdropTilemapBuffer+1,x
-		inx
-		inx
-		cpx #$316+$C0+$24
-	bne :-
-	ldx #$3FE+$C0+$24
-	:
-		sta f:BackdropTilemapBuffer+1,x
-		inx
-		inx
-		cpx #$416+$C0+$24
-	bne :-
-rts
+jmp DrawToBeatLines
 
 ClearTilemap:
 	seta16
@@ -505,11 +464,20 @@ ClearTilemap:
 		dex
 		dex
 	bpl :-
+; Set header palette (TODO: Only necessary on program load)
 	seta8
+	lda #(3<<2)|$20 ; palette 3, priority
+	ldx #62
+	:
+		sta f:TilemapBuffer+$C0+1,x
+		dex
+		dex
+	bpl :-
 rts
 
 WriteTilemapHeader:
-	ldx #$C8
+	;ldx #$C8
+	ldx #$C6
 WriteTilemapText:
 	sty 0
 	ldy #0
@@ -749,7 +717,7 @@ rtl
 MapDataAddresses:
 .addr SongGuiMap, ChainGuiMap, InstrumentGuiMap
 MapData:
-.incbin "gfx/gui.inc"
+.incbin "gfx/gui2.inc"
 SongGuiMap = 4
 ChainGuiMap = 4 + 32*30
 InstrumentGuiMap = 4 + 32*30*2
@@ -782,23 +750,18 @@ LineNumberSprites:
 LineNumbers:
 ; TODO: This seems like a massive waste of space, considering all the repetition
 ChainAndPhraseLineNumbers:
-.byte 12,53,$20,%00110000|2
-.byte 17,53,$20,%00110000|2
-.byte 12,85,$20,%00110000|2
-.byte 17,85,$24,%00110000|2
-.byte 12,117,$20,%00110000|2
-.byte 17,117,$28,%00110000|2
-.byte 12,149,$20,%00110000|2
-.byte 17,149,$2C,%00110000|2
-
-.byte 124,53,$20,%00110000|2
-.byte 129,53,$20,%00110000|2
-.byte 124,85,$20,%00110000|2
-.byte 129,85,$24,%00110000|2
-.byte 124,117,$20,%00110000|2
-.byte 129,117,$28,%00110000|2
-.byte 124,149,$20,%00110000|2
-.byte 129,149,$2C,%00110000|2
+@LineNumberXOffset .set 12
+.repeat 2
+	.byte @LineNumberXOffset,53,$20,%00110000|2
+	.byte @LineNumberXOffset+5,53,$20,%00110000|2
+	.byte @LineNumberXOffset,85,$20,%00110000|2
+	.byte @LineNumberXOffset+5,85,$24,%00110000|2
+	.byte @LineNumberXOffset,117,$20,%00110000|2
+	.byte @LineNumberXOffset+5,117,$28,%00110000|2
+	.byte @LineNumberXOffset,149,$20,%00110000|2
+	.byte @LineNumberXOffset+5,149,$2C,%00110000|2
+	@LineNumberXOffset .set (@LineNumberXOffset + (ChildViewOffsetInTiles * 8))
+.endrepeat
 
 SongLineNumbers:
 .byte 12,53,$20,%00110000|2
@@ -819,7 +782,7 @@ NoLineNumbers:
 
 .segment "RODATA"
 GuiChr:
-.incbin "gfx/gui.chr"
+.incbin "gfx/gui2.chr"
 GuiChrEnd:
 
 .segment "BSS"

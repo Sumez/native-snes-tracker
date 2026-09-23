@@ -83,7 +83,7 @@ seta16
 	lda z:LoadView_TilemapOffset
 	sta TilemapOffset
 	clc
-	adc #28
+	adc #(ChildViewOffsetInTiles*2)
 	sta ChildTilemapOffset
 seta8
 	tya
@@ -287,15 +287,17 @@ jmp NavigateToScreen
 NavigateToPhrase_long: jsr NavigateToPhrase
 rtl
 NavigateToPhrase:
-	ldx CursorRow
-	lda PhraseIndexes,x
-	cmp #$ff
-	beq :+
-		tay
-		lda #1
-		sta ChildViewInFocus
-		jsl JumpToChildView
-		rts
+	lda CursorColumn
+	bne :+
+		ldx CursorRow
+		lda PhraseIndexes,x
+		cmp #$ff
+		beq :+
+			tay
+			lda #1
+			sta ChildViewInFocus
+			jsl JumpToChildView
+			rts
 	:
 jmp PlayMosaic
 
@@ -766,7 +768,7 @@ ShowCursor:
 	ldx TilemapOffset
 	stx CursorOffset
 	
-	lda #2
+	lda #5
 	sta HighlightLength
 
 	lda SelectionStart

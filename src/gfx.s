@@ -3,19 +3,30 @@
 
 .segment "CODE7"
 PatternPalette:
-.incbin "gfx/font.inc.0.pal",0,24
-.word $0000, $7fff, $252e, $0000 ; Palette used by UI text on panel backgrounds (unused)
+.incbin "gfx/gui2.inc.0.pal"
+;.incbin "gfx/font.inc.0.pal",0,24
+;.word $0000, $7fff, $252e, $0000 ; Palette used by UI text on panel backgrounds (unused)
 PatternPaletteHighlight:
-.incbin "gfx/font2.pal",0,6		; Normal unhilit cell
-.word $4b3f ; Color used for row number sprites
-.word $0000, $7fff, $7a50, $7dbe ; Highlit cell
-.word $0000, $0000, $38A0, $0000 ; backdrop stuff
-.word $0000, $127d, $0133, $0000 ; Unused instrument
+.incbin "gfx/gui2.inc.1.pal"
+;.incbin "gfx/font2.pal",0,6		; Normal unhilit cell
+
+;.word $0000, $7fff, $39d0 ; Normal unhilit cell
+;.word $39d0 ; Color used for row number sprites
+
+;.word $0000, $7fff, $0000, $7dbe ; Highlit cell
+;.word $0000, $7fff, $39d0, $7dbe ; Highlit cell
+
+;.word $0000, $4EFB, $38A0, $0000 ; Unused, backdrop, 0-4-8-12 rows, unused
+
+;.word $0000, $127d, $0133, $0000 ; Unused instrument
+
 PatternPaletteDim:
-.incbin "gfx/font.inc.2.pal"
+.incbin "gfx/font.inc.2.pal",0,30
+.incbin "gfx/gui2.inc.2.pal",20,2 ; Makes "active playing" sprite color match the background highlighter for the same
 GuiPalette:
-.incbin "gfx/gui.inc.0.pal",0,16
-.word $0000, $0000, $4128, $0000 ; 3rd index is used by the row highlighting currentply playing phrase bar
+.incbin "gfx/gui2.inc.0.pal",0,16
+.incbin "gfx/gui2.inc.2.pal",16,16 ; 3rd index is used by the row highlighting currentply playing phrase bar
+.word $0000, $0000, $00d3, $0000 ; 3rd index is used by the row highlighting currentply playing phrase bar
 
 
 .export LoadVRAM, LoadOAM
@@ -191,16 +202,16 @@ LoadPalettes:
 	ldy #.loword(PatternPaletteHighlight)
 	jsr loadPalette
 	
-	lda #$09
-	sta CGADDR
-	lda #$42
-	sta CGDATA
-	lda #$10
-	sta CGDATA
-	lda #$28
-	sta CGDATA
-	lda #$41
-	sta CGDATA
+	;lda #$09
+	;sta CGADDR
+	;lda #$42
+	;sta CGDATA
+	;lda #$10
+	;sta CGDATA
+	;lda #$28
+	;sta CGDATA
+	;lda #$41
+	;sta CGDATA
 
 	lda #$96
 	sta CGADDR

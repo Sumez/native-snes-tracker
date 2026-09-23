@@ -88,7 +88,7 @@ UpdateCursorSpriteAndHighlight:
 	asl
 	asl
 	sec
-	sbc #3
+	sbc #2
 	sta OamBuffer+0
 	clc
 	adc #16
